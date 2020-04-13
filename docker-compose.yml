@@ -1,0 +1,53 @@
+version: '3.7'
+services:
+  nginx:
+    image: nginx:1.15-alpine
+    restart: unless-stopped
+    volumes:
+      #- ./data/my-app/dist:/var/www/html/Vue/dist
+      #- ./data/recipes/dist:/var/www/html/Nuxt/dist
+  #    - ./data/gp2/dist:/var/www/html/Vue/dist
+      - ./data/nginx:/etc/nginx/conf.d
+      #- ./data/certbot/conf:/etc/letsencrypt
+      #- ./data/certbot/www:/var/www/certbot
+    ports:
+      - "8000:8000"
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+    networks:
+      - my-net
+    
+  postgres:
+    image: postgres
+    restart: always
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - my-net
+    environment:
+      POSTGRES_PASSWORD: "testing123"
+
+    
+  graphql-engine:
+    image: hasura/graphql-engine:v1.1.1
+    ports:
+      - "8080:8080"
+    depends_on:
+      - "postgres"
+    restart: always
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgres://postgres:testing123@postgres:5432/postgres
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true" # set to "false" to disable console
+      HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
+      ## uncomment next line to set an admin secret
+      # HASURA_GRAPHQL_ADMIN_SECRET: myadminsecretkey
+    networks:
+      - my-net  
+volumes:
+  db_data:
+
+networks:
+  my-net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.18.0.0/24
