@@ -1,7 +1,7 @@
 version: '3.7'
 services:
   nginx:
-    image: nginx:1.15-alpine
+    image: thothlogos/aluapinex1.3:latest
     restart: unless-stopped
     volumes:
       #- ./data/my-app/dist:/var/www/html/Vue/dist
@@ -10,7 +10,7 @@ services:
       - ./data/nginx:/etc/nginx/conf.d
       #- ./data/certbot/conf:/etc/letsencrypt
       #- ./data/certbot/www:/var/www/certbot
-      - cover-test:/cover-test
+      - cover-data:/cover-data
     ports:
       - "8000:8000"
     command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
@@ -22,7 +22,7 @@ services:
     restart: always
     volumes:
       - db_data:/var/lib/postgresql/data
-      - cover-test:/cover-test
+      - cover-data:/cover-data
     networks:
       - my-net
     environment:
@@ -45,10 +45,10 @@ services:
     networks:
       - my-net
     volumes:
-      - cover-test:/cover-test
+      - cover-data:/cover-data
 volumes:
   db_data:
-  cover-test:
+  cover-data:
 
 networks:
   my-net:
