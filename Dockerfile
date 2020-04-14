@@ -1,9 +1,6 @@
 FROM nginx:1.15-alpine
 
 RUN mkdir -p /run/nginx
-RUN apk add --no-cache nginx-mod-http-lua
-RUN apk add --no-cache nano
-RUN apk add --no-cache bash
 RUN rm /etc/nginx/nginx.conf
 RUN mkdir /cover-data
 RUN chown nginx:nginx /cover-data
