@@ -17,6 +17,7 @@ services:
     networks:
       - my-net
 
+
   postgres:
     image: postgres
     restart: unless-stopped
@@ -27,6 +28,7 @@ services:
       - my-net
     environment:
       POSTGRES_PASSWORD: "testing123"
+
 
   graphql-engine:
     image: hasura/graphql-engine:v1.1.1
@@ -46,18 +48,20 @@ services:
     volumes:
       - cover-data:/cover-data
 
-#  nodews:
-#    image: 
-#    restart: unless-stopped
-#    ports:
-#      - "8011:8011"
-#    depends_on:
-#      - "nginx"
-#    volumes:
-#      - cover-data:/cover-data
-#    networks:
-#      - my-net
-#    environment:
+
+  nodews:
+    image: node:12.16.2-alpine3.9
+    restart: unless-stopped
+    ports:
+      - "8011:8011"
+    depends_on:
+      - "nginx"
+    volumes:
+      - cover-data:/cover-data
+    networks:
+      - my-net
+    environment:
+
 
 volumes:
   db_data:
