@@ -1,7 +1,7 @@
 version: '3.7'
 services:
   nginx:
-    image: thothlogos/aluapinex1.3:latest
+    image: thothlogos/alpinexws-0.1:latest
     restart: unless-stopped
     volumes:
       #- ./data/my-app/dist:/var/www/html/Vue/dist
@@ -16,10 +16,10 @@ services:
     command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
     networks:
       - my-net
-    
+
   postgres:
     image: postgres
-    restart: always
+    restart: unless-stopped
     volumes:
       - db_data:/var/lib/postgresql/data
       - cover-data:/cover-data
@@ -28,14 +28,13 @@ services:
     environment:
       POSTGRES_PASSWORD: "testing123"
 
-    
   graphql-engine:
     image: hasura/graphql-engine:v1.1.1
     ports:
       - "8080:8080"
     depends_on:
       - "postgres"
-    restart: always
+    restart: unless-stopped
     environment:
       HASURA_GRAPHQL_DATABASE_URL: postgres://postgres:testing123@postgres:5432/postgres
       HASURA_GRAPHQL_ENABLE_CONSOLE: "true" # set to "false" to disable console
@@ -46,6 +45,20 @@ services:
       - my-net
     volumes:
       - cover-data:/cover-data
+
+#  nodews:
+#    image: 
+#    restart: unless-stopped
+#    ports:
+#      - "8011:8011"
+#    depends_on:
+#      - "nginx"
+#    volumes:
+#      - cover-data:/cover-data
+#    networks:
+#      - my-net
+#    environment:
+
 volumes:
   db_data:
   cover-data:
