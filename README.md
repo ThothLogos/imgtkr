@@ -39,3 +39,14 @@
 - Solve the Nginx Octet prompt bullshit
 
 - Can Nginx (or a lua functionality) allow us to detect the zip and redirect `/imagefetch` -> `/cover-data/image_archive.zip` ? How can we save an extra step here to make it seamless? Can the `image_fetch_unlock.sh` script be made to pause execution until the zip file shows up? Must test.
+
+
+### Next Ideas
+
+- Nginx doesn't natively support CGI. Can we use FastCGI to do something like: browser pushes array of images to cgi endpoint, cgi script does its work, places zip in a served directory, then messages back that the file is complete/ready? Then browsier handles the response and either attempts to download the zip or not, based on success/failure?
+
+- Nginx can act to proxy requests to a WebSockets server. Can we run node on nginx container (or separate container), then browser sends array of images to /websocket_addr, nginx passes this request to a node server which receives the array, parses/sanity checks, does the downloading/zipping, then either:
+
+  - Directly pushes blob data back through to the browser, which would've been doing some async shit waiting for a response, then grabs the zip?
+
+  - Or, if we can't do that, can we send a simple response that "zip script successful, here is the url/filename" and the browser utilizes that response to grab the file after from a 2nd, nginx served directory? (shared volume)
