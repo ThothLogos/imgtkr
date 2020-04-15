@@ -44,7 +44,7 @@ services:
 
 
   nodews:
-    image: thothlogos/nodews:0.1
+    image: thothlogos/nodews:0.2
     user: "node"
     restart: unless-stopped
     expose:

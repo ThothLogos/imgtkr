@@ -11,8 +11,16 @@
         websock.send("dothething");
       };
 
-      websock.onmessage = function(str) {
-        console.log("Client received: ", str);
+      websock.onmessage = function(msg) {
+        if (msg.data instanceof Blob) {
+          reader = new FileReader();
+          reader.onload = () => {
+            console.log("Result: " + reader.result);
+          };
+          reader.readAsText(msg.data);
+        } else {
+          console.log("Client received: ", msg.data);
+        }
       };
     </script>
   </body>
