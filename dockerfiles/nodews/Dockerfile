@@ -8,5 +8,6 @@ COPY ./data/testimages.zip ./cover-data/testimages.zip
 COPY ./data/package.json ./package.json
 COPY ./data/server.js ./server.js
 RUN npm install ws
+RUN npm install request
 
 EXPOSE 8011

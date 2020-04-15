@@ -4,14 +4,34 @@
   <body>
     <script type="text/javascript" src="file:///C:/Projects/docker-guttest/FileSaver.js"></script>
     <script>
+      
+      let imagelist = [];
+      let doit = true;
+
+      function randomIntFromInterval(min, max) { // min and max included 
+        return Math.floor(Math.random() * (max - min + 1) + min);
+      }
+      
+      let last3 = randomIntFromInterval(100,900);
+      for(let i = 10; i > 0; i--) {
+        last3 = last3 - i;
+        let str = `https://retailerservices.diamondcomics.com/Image/ItemMainImageLowRes/STL060${last3}.jpg`;
+        imagelist.push(str);
+      }
+
+      //console.log(JSON.stringify(imagelist));
+
+      // Connect with server
       let websock = new WebSocket('ws://localhost:8011');
-
       websock.binaryType = "blob";
-
       websock.onopen = function(event) {
         console.log("WebSocket is open now.");
         websock.send("Is there anybody out there?");
-        websock.send("dothething");
+        if (doit) {
+          websock.send(JSON.stringify(imagelist));
+        } else {
+          websock.send("Holding.");
+        }
       };
 
       websock.onmessage = function(msg) {
@@ -26,7 +46,6 @@
           console.log("Client received: ", msg.data);
         }
       };
-
     </script>
   </body>
 </html>
