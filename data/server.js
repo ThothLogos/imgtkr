@@ -33,10 +33,11 @@ var WebSocketServer = require('ws').Server
           console.log(' [!] Orders received, attempting send of zip');
           let pack = getImageArchive(zipfile);
           ws.binaryType = "blob";
+          console.log(`Pack is packed, type set to: ${ws.binaryType}.`);
           ws.send(pack);
         } else {
           console.log('Received from client: %s', message);
+          ws.send('Server received from client: ' + message);
         }
-        ws.send('Server received from client: ' + message);
     });
  });
