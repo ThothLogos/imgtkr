@@ -32,7 +32,7 @@
 
 - As changes are made to our `Dockerfile`, keep `docker-compose.yml` in line with the new versions. Tear down, rebuild.
 
-### TODO
+### TODO \[DEPRECATED]
 
 - Postgres side needs: watcher script for lockfile, and getpics script to generate zip file output to /cover-data.
 
@@ -41,7 +41,7 @@
 - Can Nginx (or a lua functionality) allow us to detect the zip and redirect `/imagefetch` -> `/cover-data/image_archive.zip` ? How can we save an extra step here to make it seamless? Can the `image_fetch_unlock.sh` script be made to pause execution until the zip file shows up? Must test.
 
 
-### Next Ideas
+### Next Ideas \[DEPRECATED]
 
 - Nginx doesn't natively support CGI. Can we use FastCGI to do something like: browser pushes array of images to cgi endpoint, cgi script does its work, places zip in a served directory, then messages back that the file is complete/ready? Then browsier handles the response and either attempts to download the zip or not, based on success/failure?
 
