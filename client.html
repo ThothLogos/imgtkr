@@ -13,6 +13,7 @@
 
       websock.onmessage = function(msg) {
         if (msg.data instanceof Blob) {
+          console.log("Client Data: Blob incoming...");
           reader = new FileReader();
           reader.onload = () => {
             console.log("Result: " + reader.result);
