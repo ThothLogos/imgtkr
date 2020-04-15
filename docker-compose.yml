@@ -1,25 +1,21 @@
 version: '3.7'
 services:
   nginx:
-    image: thothlogos/aluapinex1.3:latest
+    image: thothlogos/alpinexws-0.1:latest
     restart: unless-stopped
     volumes:
-      #- ./data/my-app/dist:/var/www/html/Vue/dist
-      #- ./data/recipes/dist:/var/www/html/Nuxt/dist
-      #- ./data/gp2/dist:/var/www/html/Vue/dist
       - ./data/nginx:/etc/nginx/conf.d
-      #- ./data/certbot/conf:/etc/letsencrypt
-      #- ./data/certbot/www:/var/www/certbot
       - cover-data:/cover-data
     ports:
       - "8000:8000"
     command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
     networks:
       - my-net
-    
+
+
   postgres:
     image: postgres
-    restart: always
+    restart: unless-stopped
     volumes:
       - db_data:/var/lib/postgresql/data
       - cover-data:/cover-data
@@ -28,24 +24,44 @@ services:
     environment:
       POSTGRES_PASSWORD: "testing123"
 
-    
+
   graphql-engine:
     image: hasura/graphql-engine:v1.1.1
     ports:
       - "8080:8080"
     depends_on:
       - "postgres"
-    restart: always
+    restart: unless-stopped
     environment:
       HASURA_GRAPHQL_DATABASE_URL: postgres://postgres:testing123@postgres:5432/postgres
       HASURA_GRAPHQL_ENABLE_CONSOLE: "true" # set to "false" to disable console
       HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
-      ## uncomment next line to set an admin secret
       # HASURA_GRAPHQL_ADMIN_SECRET: myadminsecretkey
     networks:
       - my-net
     volumes:
       - cover-data:/cover-data
+
+
+  nodews:
+    image: thothlogos/nodews:0.1
+    user: "node"
+    restart: unless-stopped
+    expose:
+      - "8011"
+    ports:
+      - "8011:8011"
+    depends_on:
+      - "nginx"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - cover-data:/cover-data
+    networks:
+      - my-net
+    command: "node ./server.js"
+
+
 volumes:
   db_data:
   cover-data:

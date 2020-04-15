@@ -1,0 +1,6 @@
+{
+  "name": "nodews_test",
+  "dependencies": {
+    "ws": "^7.2.3"
+  }
+}
