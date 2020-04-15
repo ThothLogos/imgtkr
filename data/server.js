@@ -1,21 +1,20 @@
 const fs = require('fs');
 const request = require('request');
+const JSZip = require('jszip');
 
 const datadir = `/cover-data`;
 const zipfile = `${datadir}/testimages.zip`;
 
+/*
 function checkFileExistsSync(path){
   let flag = true;
-  try{
-    fs.accessSync(path, fs.F_OK);
-  }catch(e){
-    flag = false;
-  }
+  try { fs.accessSync(path, fs.F_OK); }
+  catch(e) { flag = false; }
   return flag;
-}
+} */
 
 function getImageArchive(path) {
-  if (checkFileExistsSync(path)) {
+  if (fs.existsSync(path)) {
     console.log(`Found archive at ${path}, attempting read...`);
     return fs.readFileSync(path);
   } else {
@@ -33,25 +32,44 @@ function isValidImageURL(image_url) {
   return true;
 }
 
-function wgetImageURL(image_url) {
-  let filename = image_url.toString().split('/').pop();
-  if (checkFileExistsSync(`${datadir}/${filename}`)) {
-    console.log (`WARN: wgetImageURL skipped for ${filename}, already exists.`);
+function wgetImageURL(image_url, dir) {
+  let img = image_url.toString().split('/').pop();
+  if (fs.existsSync(`${datadir}/${dir}/${img}`)) {
+    console.log (`WARN: wgetImageURL skipped for ${img}, already exists.`);
   } else {
-    try { request(image_url).pipe(fs.createWriteStream(`${datadir}/${filename}`)); }
-    catch (e) { console.log(`ERROR: wgetImageURL failure: ${e}`); }
+    try { request(image_url).pipe(fs.createWriteStream(`${datadir}/${dir}/${img}`)); }
+    catch (e) { console.log(`ERROR wgetImageURL fail: ${e}`); }
   }
 }
 
+function createTempImageDir() {
+  let now = Date.now();
+  if (!fs.existsSync(`${datadir}/${now}`)){
+    try { fs.mkdirSync(`${datadir}/${now}`); }
+    catch (e) { console.log(`ERROR createTempImageDir fail: ${e}`); }
+    console.log(`Created directory: ${datadir}/${now}`);
+  }
+  return now;
+}
+
 function processImageArray(imagelist) {
+  let tempdir = createTempImageDir();
   imagelist.forEach( image_url => {
     console.log("Processing URL: " + image_url);
     if (isValidImageURL(image_url)) {
-      wgetImageURL(image_url);
+      wgetImageURL(image_url, tempdir);
     } else {
-      console.log(`ERROR: failed isValidImageURL ${image_url}`);
+      console.log(`ERROR isValidImageURL fail: ${image_url}`);
     }
   });
+}
+
+function buildArchiveFromDir(image_dir) {
+
+}
+
+function cleanupTempDir(tempdir) {
+
 }
 
 console.log("Starting Node WebSocket server on 8011...");
