@@ -50,3 +50,17 @@
   - Directly pushes blob data back through to the browser, which would've been doing some async shit waiting for a response, then grabs the zip?
 
   - Or, if we can't do that, can we send a simple response that "zip script successful, here is the url/filename" and the browser utilizes that response to grab the file after from a 2nd, nginx served directory? (shared volume)
+
+### 4/15 Success
+
+- Created a custom NodeJS image Dockerfile that ensures access to shared volume and installs server.js and npm necessities. Runs on port 8011.
+
+- Nginx handles requests to 8011 and has updated configs to allow WebSocket passthrough.
+
+- Client-side browser uses built-in WebSocket() class to send a specific request string, to which the server will respond by serving the testimages.zip file as a Blob. Client receives this message and uses FileReader.readAsArrayBuffer to trigger onload() which uses FileSaver.saveAs(msg.data) to rip the Blob to local file.
+
+- Zip successfully transferred!
+
+- TODO: Have client send a JS Array to the server. Server should parse this message for sanity checks, once passing it performs the `wget` operations to get the images, compile them into a zip, and use that instead of a test file.
+
+- TODO: Client should have proper async handling of this event: a button to send the array, an element that shows status "Ready/Transmitting/Waiting for Response/Received", updated as different parts progress. The main goal is responsive user feedback that lets them know things are happening - large zip files may take several momments to wget and transmit.
