@@ -8,6 +8,7 @@
       websock.onopen = function(event) {
         console.log("WebSocket is open now.");
         websock.send("Is there anybody out there?");
+        websock.send("dothething");
       };
 
       websock.onmessage = function(str) {
