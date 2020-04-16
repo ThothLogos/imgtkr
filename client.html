@@ -42,6 +42,7 @@
             saveAs(msg.data, "plzwork.zip");
           };
           reader.readAsArrayBuffer(msg.data);
+          websock.send("Client received zip.");
         } else {
           console.log("Client received: ", msg.data);
         }

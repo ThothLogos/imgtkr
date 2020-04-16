@@ -95,7 +95,8 @@ var WebSocketServer = require('ws').Server
             let ziploc = buildArchiveFromDir(tempdir);
             let pack = getImageArchive(ziploc);
             ws.binaryType = "blob";
-            console.log(`Pack is packed, type set to: ${ws.binaryType}.`);
+            console.log(`Data packed, socket set to: ${ws.binaryType}.`);
+            console.log("Sending latest.zip to client.");
             ws.send(pack);
           }
         } else {
