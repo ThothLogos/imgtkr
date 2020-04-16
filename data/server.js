@@ -5,7 +5,8 @@ const JSZip = require('jszip');
 const datadir = `/cover-data`;
 const zipfile = `${datadir}/testimages.zip`;
 
-/*
+/* Using fs.existsSync for now, feelin' cute, may delete later
+
 function checkFileExistsSync(path){
   let flag = true;
   try { fs.accessSync(path, fs.F_OK); }
@@ -29,12 +30,12 @@ function isValidJSON(str) {
 }
 
 function isValidImageURL(image_url) {
-  return true;
+  return true; // TODO: sanity-check URL format
 }
 
 function wgetImageURL(image_url, dir) {
   let img = image_url.toString().split('/').pop();
-  if (fs.existsSync(`${datadir}/${dir}/${img}`)) {
+  if (fs.existsSync(`${datadir}/${dir}/${img}`)) { // Prevent duplicates
     console.log (`WARN: wgetImageURL skipped for ${img}, already exists.`);
   } else {
     try { request(image_url).pipe(fs.createWriteStream(`${datadir}/${dir}/${img}`)); }
@@ -65,11 +66,11 @@ function processImageArray(imagelist) {
 }
 
 function buildArchiveFromDir(image_dir) {
-
+  // TODO: Use JSZip to create zipfile from tempdir
 }
 
 function cleanupTempDir(tempdir) {
-
+  // TODO: Verify zip is in-place/finished, then clean up tempdir/images
 }
 
 console.log("Starting Node WebSocket server on 8011...");

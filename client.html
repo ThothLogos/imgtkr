@@ -4,14 +4,14 @@
   <body>
     <script type="text/javascript" src="file:///C:/Projects/docker-guttest/FileSaver.js"></script>
     <script>
-      
-      let imagelist = [];
-      let doit = true;
+      let doit = true; // Temporary dev flag to toggle sending the array
+      let imagelist = []; // This will be sent to the server via WebSocket
 
-      function randomIntFromInterval(min, max) { // min and max included 
+      function randomIntFromInterval(min, max) {
         return Math.floor(Math.random() * (max - min + 1) + min);
       }
       
+      // Generate some psuedo-random image sets so we get diff zips on retries
       let last3 = randomIntFromInterval(200,900);
       for(let i = 10; i > 0; i--) {
         last3 = last3 - i;
@@ -19,13 +19,11 @@
         imagelist.push(str);
       }
 
-      //console.log(JSON.stringify(imagelist));
-
       // Connect with server
       let websock = new WebSocket('ws://localhost:8011');
       websock.binaryType = "blob";
       websock.onopen = function(event) {
-        console.log("WebSocket is open now.");
+        console.log("WebSocket is now open.");
         websock.send("Is there anybody out there?");
         if (doit) {
           websock.send(JSON.stringify(imagelist));
@@ -37,7 +35,7 @@
       websock.onmessage = function(msg) {
         if (msg.data instanceof Blob) {
           console.log("Client Data: Blob incoming...");
-          reader = new FileReader();
+          reader = new FileReader(); // TODO: Do I even need this reader? ...
           reader.onload = () => {
             saveAs(msg.data, "plzwork.zip");
           };
