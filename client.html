@@ -15,7 +15,7 @@
       
       // Generate some psuedo-random image sets so we get diff zips on retries
       let last3 = randomIntFromInterval(200,900);
-      for(let i = 3; i > 0; i--) {
+      for(let i = 10; i > 0; i--) {
         last3 = last3 - i;
         let str = `https://retailerservices.diamondcomics.com/Image/ItemMainImageLowRes/STL060${last3}.jpg`;
         imagelist.push(str);
