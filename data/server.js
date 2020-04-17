@@ -1,5 +1,5 @@
-const fs = require('fs');
-const child_process = require("child_process");
+const fs = require(`fs`);
+const syscallSync = require(`child_process`).execSync;
 
 const datadir = `/cover-data`;
 const zipfile = `${datadir}/testimages.zip`;
@@ -28,14 +28,14 @@ function isValidJSON(str) {
 }
 
 function isValidImageURL(image_url) {
-  return true; // TODO: sanity-check URL format
+  return /^(?:\w+:)?\/\/([^\s\.]+\.\S{2}|localhost[\:?\d]*)\S*$/.test(image_url)
 }
 
 function wgetImageURL(image_url, dir, img) {
   if (fs.existsSync(`${dir}/${img}`)) { // Prevent duplicates
     console.log (`WARN: wgetImageURL skipped for ${img}, already exists.`);
   } else {
-    try { child_process.execSync(`wget ${image_url} -P ${dir}/`); }
+    try { syscallSync(`wget ${image_url} -P ${dir}/`); }
     catch (e) { console.log(`ERROR wgetImageURL fail: ${e}`); }
   }
 }
@@ -55,7 +55,7 @@ function processImageArray(imagelist, tempdir, ws) {
   imagelist.forEach( image_url => {
     console.log(`Processing: ${image_url}`);
     if (isValidImageURL(image_url)) {
-      let img = image_url.toString().split('/').pop();
+      let img = image_url.toString().split(`/`).pop();
       wgetImageURL(image_url, tempdir, img);
       console.log(`File complete: ${img}`);
       let chunk = { request:`imagechunk`,result:`success`,file:img };
@@ -69,27 +69,23 @@ function processImageArray(imagelist, tempdir, ws) {
 function buildArchiveFromDir(image_dir) {
   console.log(`tempdir holding: ${image_dir}`)
   if (fs.existsSync(`${datadir}/latest.zip`)) { fs.unlinkSync(`${datadir}/latest.zip`) }
-  child_process.execSync(`zip -urj ${datadir}/latest.zip ${image_dir}/*`);
+  syscallSync(`zip -urj ${datadir}/latest.zip ${image_dir}/*`);
   if (fs.existsSync(`${datadir}/latest.zip`)) {
-    console.log("latest.zip created");
+    console.log(`latest.zip created`);
   }
   return `${datadir}/latest.zip`;
 }
 
-function cleanupTempDir(tempdir) {
-  // TODO: Verify zip is in-place/finished, then clean up tempdir/images
-}
-
-console.log("Starting Node WebSocket server on 8011...");
-var WebSocketServer = require('ws').Server;
+console.log(`Starting Node WebSocket server on 8011...`);
+var WebSocketServer = require(`ws`).Server;
 wss = new WebSocketServer({port: 8011});
 
-wss.on('connection', function(ws) {
-  ws.on('message', function(message) {
+wss.on(`connection`, function(ws) {
+  ws.on(`message`, function(message) {
     if (isValidJSON(message)) {
       let imagelist = JSON.parse(message);
       if (Array.isArray(imagelist)) {
-        console.log("Passed the isArray test, attempting processing");
+        console.log(`Passed the isArray test, attempting processing`);
         // Tell client we got good data and expected image count
         ws.send(JSON.stringify({request:`array`,result:`success`,size:imagelist.length}));
 
@@ -105,6 +101,9 @@ wss.on('connection', function(ws) {
         ws.binaryType = `blob`; // Actually nodebuffer
         console.log(`Sending latest.zip to client.`);
         ws.send(pack);
+
+        // We don't need to store the raw images anymore
+        syscallSync(`rm -r ${tempdir}`);
       }
     } else {
       console.log(`Received from client: ${message}`);
