@@ -31,15 +31,12 @@ function isValidImageURL(image_url) {
   return true; // TODO: sanity-check URL format
 }
 
-function wgetImageURL(image_url, dir) {
-  let img = image_url.toString().split('/').pop();
+function wgetImageURL(image_url, dir, img) {
   if (fs.existsSync(`${dir}/${img}`)) { // Prevent duplicates
     console.log (`WARN: wgetImageURL skipped for ${img}, already exists.`);
   } else {
-    try {
-      child_process.execSync(`wget ${image_url} -P ${dir}/`);
-      console.log(`File complete: ${img}`);
-    } catch (e) { console.log(`ERROR wgetImageURL fail: ${e}`); }
+    try { child_process.execSync(`wget ${image_url} -P ${dir}/`); }
+    catch (e) { console.log(`ERROR wgetImageURL fail: ${e}`); }
   }
 }
 
@@ -53,11 +50,14 @@ function createTempImageDir() {
   return `${datadir}/${now}`;
 }
 
-function processImageArray(imagelist, tempdir) {
+function processImageArray(imagelist, tempdir, ws) {
   imagelist.forEach( image_url => {
     console.log("Processing URL: " + image_url);
     if (isValidImageURL(image_url)) {
-      wgetImageURL(image_url, tempdir);
+      let img = image_url.toString().split('/').pop();
+      wgetImageURL(image_url, tempdir, img);
+      console.log(`File complete: ${img}`);
+      ws.send(`Image ${img} got got.`);
     } else {
       console.log(`ERROR isValidImageURL fail: ${image_url}`);
     }
@@ -91,7 +91,7 @@ wss.on('connection', function(ws) {
         ws.send("Server attempting to process image list, please wait...");
 
         let tempdir = createTempImageDir();
-        processImageArray(imagelist, tempdir);
+        processImageArray(imagelist, tempdir, ws);
         let pack = getImageArchive(buildArchiveFromDir(tempdir));
 
         ws.binaryType = `blob`; // Actually nodebuffer
