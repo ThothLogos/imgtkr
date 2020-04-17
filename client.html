@@ -11,9 +11,11 @@
     </div>
     <button id="btnGetZip">Request Zip</button>
     <button id="btnClearLog">Clear Log</button>
-    <h4>Status:</h4>
-    <div id="progressShell" style="width: 100%;background-color:wheat;">
-      <div id="progressBar" style="width: 0%;height: 30px;background-color: green;"></div>
+    <div style="width:50%">
+      <b>Progress:</b>
+      <div id="progressShell" style="width: 100%;background-color:wheat;">
+        <div id="progressBar" style="width: 0%;height: 30px;background-color: green;"></div>
+      </div>
     </div>
     <script type="text/javascript" src="FileSaver.js"></script>
     <script>
@@ -29,8 +31,6 @@
 
       txtLog.value       = ``;
       websock.binaryType = `blob`;
-
-
 
       function randomIntFromInterval(min, max) {
         return Math.floor(Math.random() * (max - min + 1) + min);
@@ -73,9 +73,9 @@
       function timeout(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
       }
-      
-      function updateProgressBar(newprogress) {
-        progressBar.style.width = `${newprogress}%`;
+
+      function updateProgressBar(progress) {
+        progressBar.style.width = `${progress}%`;
       }
 
       websock.onopen = function(event) {
@@ -98,21 +98,21 @@
               imagecount = res.size;
               currentprog = 0;
               updateProgressBar(currentprog);
-              dlog(`Now processing ${res.size} image urls server-side.`);
+              dlog(`  (SERVER) Processing ${res.size} image URLs.`);
             } else {
-              dlog(`Server done processing images`);
+              dlog(`  (SERVER) Done processing images. Sending zip.`);
               currentprog = 100;
               updateProgressBar(currentprog);
             }
           } else if (res.request == `imagechunk` && res.result == `success`) {
-            dlog(`Image ${res.file} complete`);
+            dlog(`  (SERVER) ${res.file} retrieved`);
             currentprog += Math.floor(100 / imagecount);
             updateProgressBar(currentprog);
           } else {
             dlog(`Unknown JSON response: ${res}`);
           }
         } else {
-          dlog(`Received message: ${msg.data}`);
+          console.log(`Received message: ${msg.data}`);
         }
       };
 
