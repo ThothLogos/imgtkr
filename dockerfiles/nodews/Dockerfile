@@ -1,6 +1,5 @@
 FROM node:12.16.2-alpine3.9
 
-RUN apk add --no-cache nano
 RUN apk add --no-cache zip
 RUN mkdir /cover-data
 RUN chown node:node /cover-data
