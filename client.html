@@ -2,51 +2,80 @@
 <html>
   <head><meta charset="utf-8"></head>
   <body>
-    <h2>My Cool WebSocket Client</h2>
-    <img src="http://www.theoklahomakid.com/images/fire-under-construction-animation_1_.gif"/>
-    <script type="text/javascript" src="file:///C:/Projects/docker-guttest/FileSaver.js"></script>
+    <div id="logger">
+      <textarea id="log" rows="10" cols="80">
+
+      </textarea>
+    </div>
+    <button id="btnGetZip">Request Zip</button>
+    <button id="btnClearLog">Clear Log</button>
+    <script type="text/javascript" src="FileSaver.js"></script>
     <script>
-      let doit = true; // Temporary dev flag to toggle sending the array
-      let imagelist = []; // This will be sent to the server via WebSocket
+      let btnGetZip   = document.getElementById(`btnGetZip`);
+      let btnClearLog = document.getElementById(`btnClearLog`);
+      let txtLog      = document.getElementById(`log`);
+      let websock     = new WebSocket(`ws://localhost:8011`);
+
+      const url_root = `https://retailerservices.diamondcomics.com/Image/ItemMainImageLowRes`;
+      txtLog.value       = ``;
+      websock.binaryType = `blob`;
 
       function randomIntFromInterval(min, max) {
         return Math.floor(Math.random() * (max - min + 1) + min);
       }
-      
-      // Generate some psuedo-random image sets so we get diff zips on retries
-      let last3 = randomIntFromInterval(200,900);
-      for(let i = 10; i > 0; i--) {
-        last3 = last3 - i;
-        let str = `https://retailerservices.diamondcomics.com/Image/ItemMainImageLowRes/STL060${last3}.jpg`;
-        imagelist.push(str);
+
+      function dlog(message) {
+        console.log(message);
+        document.getElementById(`log`).value += `${message}\n`;
       }
 
-      // Connect with server
-      let websock = new WebSocket('ws://localhost:8011');
-      websock.binaryType = "blob";
-      websock.onopen = function(event) {
-        console.log("WebSocket is now open.");
-        websock.send("Is there anybody out there?");
-        if (doit) {
-          websock.send(JSON.stringify(imagelist));
-        } else {
-          websock.send("Holding.");
+      // Generate some psuedo-random image sets so we get diff zips on retries
+      function generateImageArray() {
+        let imagelist = []; // This will be sent to the server via WebSocket
+        let last3 = randomIntFromInterval(200,900);
+        for(let i = 10; i > 0; i--) {
+          last3 = last3 - i;
+          let str = `${url_root}/STL060${last3}.jpg`;
+          imagelist.push(str);
         }
+        return imagelist;
+      }
+
+      function sendImageArray(imagelist) {
+        try { websock.send(JSON.stringify(imagelist)); }
+        catch (e) { dlog(`ERROR sendImageArray: ${e}`) };
+      }
+
+      function doGetZip() {
+        btnGetZip.removeEventListener(`click`, doGetZip);
+        btnGetZip.disabled = true;
+        dlog(`Sending image array to server.`);
+        sendImageArray(generateImageArray());
+      }
+
+      function timeout(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+
+      websock.onopen = function(event) {
+        dlog(`WebSocket is now open.`);
+        websock.send(`Is there anybody out there?`);
       };
 
       websock.onmessage = function(msg) {
         if (msg.data instanceof Blob) {
-          console.log("Client Data: Blob incoming...");
-          reader = new FileReader(); // TODO: Do I even need this reader? ...
-          reader.onload = () => {
-            saveAs(msg.data, "plzwork.zip");
-          };
-          reader.readAsArrayBuffer(msg.data);
-          websock.send("Client received zip.");
+          dlog(`Binary data incoming.`);
+          saveAs(msg.data, `plzwork.zip`);
+          websock.send(`Client received zip.`);
+          btnGetZip.disabled = false;
         } else {
-          console.log("Client received: ", msg.data);
+          dlog(`Received message: ${msg.data}`);
         }
       };
-    </script>
+
+      btnGetZip.addEventListener(`click`, doGetZip);
+      btnClearLog.addEventListener(`click`, event => { txtLog.value = ``; });
+
+      </script>
   </body>
-</html>
+  </html>
