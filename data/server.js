@@ -1,5 +1,6 @@
 const fs = require('fs');
-const child_process = require("child_process");
+const syscall = require("child_process");
+const util = require('util');
 
 const datadir = `/cover-data`;
 const zipfile = `${datadir}/testimages.zip`;
@@ -31,12 +32,13 @@ function isValidImageURL(image_url) {
   return true; // TODO: sanity-check URL format
 }
 
-function wgetImageURL(image_url, dir, img) {
+async function wgetImageURL(image_url, dir, img) {
   if (fs.existsSync(`${dir}/${img}`)) { // Prevent duplicates
     console.log (`WARN: wgetImageURL skipped for ${img}, already exists.`);
   } else {
-    try { child_process.execSync(`wget ${image_url} -P ${dir}/`); }
-    catch (e) { console.log(`ERROR wgetImageURL fail: ${e}`); }
+    try { 
+      return util.promisify(syscall.exec(`wget ${image_url} -P ${dir}/`));
+    } catch (e) { console.log(`ERROR wgetImageURL fail: ${e}`); }
   }
 }
 
@@ -56,10 +58,11 @@ function processImageArray(imagelist, tempdir, ws) {
     console.log(`Processing: ${image_url}`);
     if (isValidImageURL(image_url)) {
       let img = image_url.toString().split('/').pop();
-      wgetImageURL(image_url, tempdir, img);
-      console.log(`File complete: ${img}`);
-      let chunk = { request:`imagechunk`,result:`success`,file:img };
-      ws.send(JSON.stringify(chunk));
+      wgetImageURL(image_url, tempdir, img).then( (out, err) => {
+        console.log(`File complete: ${img}`);
+        let chunk = { request:`imagechunk`,result:`success`,file:img };
+        ws.send(JSON.stringify(chunk));
+      });
     } else {
       console.log(`ERROR isValidImageURL fail: ${image_url}`);
     }
@@ -69,7 +72,7 @@ function processImageArray(imagelist, tempdir, ws) {
 function buildArchiveFromDir(image_dir) {
   console.log(`tempdir holding: ${image_dir}`)
   if (fs.existsSync(`${datadir}/latest.zip`)) { fs.unlinkSync(`${datadir}/latest.zip`) }
-  child_process.execSync(`zip -urj ${datadir}/latest.zip ${image_dir}/*`);
+  syscall.execSync(`zip -urj ${datadir}/latest.zip ${image_dir}/*`);
   if (fs.existsSync(`${datadir}/latest.zip`)) {
     console.log("latest.zip created");
   }
@@ -108,7 +111,6 @@ wss.on('connection', function(ws) {
       }
     } else {
       console.log(`Received from client: ${message}`);
-      ws.send(`Server received from client: ${message}`);
     }
   });
 });
