@@ -18,9 +18,10 @@
   
 - __Server TODOs:__
 
-  - Need to sanity-check the URL array, parse for valid URL formatting. How to handle entries that are invalid? Best-effort?
-  - Need cleanup process to remove `tempdir` and images.
-  - Need to trap server's failure and do cleanup/graceful shutdown. 
+  - Add JSON parse message for a "getlatest" from the client. Allow client to re-download the last archive.
+  - Allow client to request a specific historic zip by name
+  - Need to trap server's failure and do cleanup/graceful shutdown.
+  - Need to manage and prune the zip history folder - keep last n.
   - Can we simplify the shared volume situation? Does nginx even need modification now?
   - Stress test, run the client script with hundreds of requests - try to double/triple-run before conclusion, etc.
   
@@ -33,4 +34,6 @@
 - __Client TODOs:__
 
   - Handle refreshes - it kills the client end of the socket apparently? Can we trap the close/refresh and post a message to the server before we die so it can wind-down & cleanup?
+  - Add button to re-grab the latest zip that's on the server
+  - Add way to access server history and select previous download
   - Stress test the server with unconventional requests: very large numbers, double-sends, etc.
