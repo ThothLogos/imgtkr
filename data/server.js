@@ -1,9 +1,9 @@
 const fs = require(`fs`);
 const syscallSync = require(`child_process`).execSync;
 
-const datadir = `/cover-data`;
-const histdir = `${datadir}/previous_zips`;
-const zipfile = `${datadir}/testimages.zip`;
+const datadir   = `/cover-data`;
+const histdir   = `${datadir}/previous_zips`;
+const latestzip = `${datadir}/latest.zip`;
 
 /* Using fs.existsSync for now, feelin' cute, may delete later
 function checkFileExistsSync(path){
@@ -67,14 +67,12 @@ function processImageArray(imagelist, tempdir, ws) {
   });
 }
 
-function buildArchiveFromDir(image_dir) {
+function buildLatestZip(image_dir) {
   console.log(`tempdir holding: ${image_dir}`)
-  if (fs.existsSync(`${datadir}/latest.zip`)) { fs.unlinkSync(`${datadir}/latest.zip`) }
-  syscallSync(`zip -urj ${datadir}/latest.zip ${image_dir}/*`);
-  if (fs.existsSync(`${datadir}/latest.zip`)) {
-    console.log(`latest.zip created`);
-  }
-  return `${datadir}/latest.zip`;
+  if (fs.existsSync(latestzip)) { fs.unlinkSync(latestzip) }
+  syscallSync(`zip -urj ${latestzip} ${image_dir}/*`);
+  archiveLatestZip(latestzip); // Timestamp and cp to histdir
+  if (fs.existsSync(latestzip)) { console.log(`${latestzip} created`); }
 }
 
 function createZipHistoryDir() {
@@ -102,6 +100,20 @@ function archiveLatestZip(zipfile) {
   syscallSync(`cp ${zipfile} ${histdir}/${yy}-${mm}-${dd}_${hr}${min}${sec}.zip`);
 }
 
+function getHistoryList() {
+  fs.readdirSync(histdir, (err, files) => {
+    if (err) { console.log(`ERROR getHistoryList: ${err}`); }
+    else { return files; }
+  });
+}
+
+function sendLatestZip(ws) {
+  let pack = getImageArchive(latestzip);
+  ws.binaryType = `blob`; // Actually nodebuffer
+  console.log(`Sending latest.zip to client.`);
+  ws.send(pack);
+}
+
 createZipHistoryDir();
 
 console.log(`Starting Node WebSocket server on 8011...`);
@@ -111,30 +123,24 @@ wss = new WebSocketServer({port: 8011});
 wss.on(`connection`, function(ws) {
   ws.on(`message`, function(message) {
     if (isValidJSON(message)) {
-      let imagelist = JSON.parse(message);
-      if (Array.isArray(imagelist)) {
+      let message = JSON.parse(message);
+      if (Array.isArray(message)) {
         console.log(`Passed the isArray test, attempting processing`);
         // Tell client we got good data and expected image count
-        ws.send(JSON.stringify({request:`array`,result:`success`,size:imagelist.length}));
+        ws.send(JSON.stringify({request:`array`,result:`success`,size:message.length}));
 
         // wget the images and zip them up server-side (synchronous but atomic syscalls)
         let tempdir = createTempImageDir();
         processImageArray(imagelist, tempdir, ws);
-        let pack = getImageArchive(buildArchiveFromDir(tempdir));
+        buildLatestZip(tempdir);
 
-        // Tell client we finished (hacky)
+        // Tell client we finished & send the latest.zip
         ws.send(JSON.stringify({request:`array`,result:`success`,size:0}));
-
-        // Send the zip
-        ws.binaryType = `blob`; // Actually nodebuffer
-        console.log(`Sending latest.zip to client.`);
-        ws.send(pack);
-
-        archiveLatestZip(`${datadir}/latest.zip`);
-
-        // We don't need to store the raw images anymore
-        syscallSync(`rm -r ${tempdir}`);
+        sendLatestZip();
+        syscallSync(`rm -r ${tempdir}`); // We don't need to store the raw images anymore
       }
+    } else if (message.request == "getlatest") {
+      sendLatestZip();
     } else {
       console.log(`Received from client: ${message}`);
       ws.send(`Server received from client: ${message}`);

@@ -9,8 +9,9 @@
       background-color:slategrey;
       white-space:pre-wrap"></textarea>
     </div>
-    <button id="btnGetZip">Request Zip</button>
-    <button id="btnClearLog">Clear Log</button>
+    <button id="btnGetZip">Send Array (New Zip)</button>
+    <button id="btnGetLatest">Get Latest Zip</button>
+    <button id="btnClearLog" style="float: right">Clear Log</button>
     <div style="width:50%">
       <b>Progress:</b>
       <div id="progressShell" style="width: 100%;background-color:wheat;">
@@ -19,11 +20,12 @@
     </div>
     <script type="text/javascript" src="FileSaver.js"></script>
     <script>
-      const btnGetZip   = document.getElementById(`btnGetZip`);
-      const btnClearLog = document.getElementById(`btnClearLog`);
-      const txtLog      = document.getElementById(`log`);
-      const progressBar = document.getElementById(`progressBar`);
-      const websock     = new WebSocket(`ws://localhost:8011`);
+      const btnGetZip    = document.getElementById(`btnGetZip`);
+      const btnGetLatest = document.getElementById('btnGetLatest');
+      const btnClearLog  = document.getElementById(`btnClearLog`);
+      const txtLog       = document.getElementById(`log`);
+      const progressBar  = document.getElementById(`progressBar`);
+      const websock      = new WebSocket(`ws://localhost:8011`);
       const url_root = `https://retailerservices.diamondcomics.com/Image/ItemMainImageLowRes`;
 
       let imagecount = 0;
@@ -59,7 +61,7 @@
       }
 
       function sendImageArray(imagelist) {
-        try {websock.send(JSON.stringify(imagelist)); }
+        try { websock.send(JSON.stringify(imagelist)); }
         catch (e) { dlog(`ERROR sendImageArray: ${e}`) };
       }
 
@@ -68,6 +70,15 @@
         btnGetZip.disabled = true;
         dlog(`Sending image array to server.`);
         sendImageArray(generateImageArray());
+      }
+
+      function doGetLatest() {
+        btnGetLatest.removeEventListener(`click`, doGetLatest);
+        btnGetLatest.disabled = true;
+        dlog(`Requesting previous latest.zip from server.`);
+        try {
+          websock.send(JSON.stringify({request:`getlatest`}));
+        } catch (e) { dlog(`ERROR doGetLatest: ${e}`); }
       }
 
       function timeout(ms) {
@@ -117,6 +128,7 @@
       };
 
       btnGetZip.addEventListener(`click`, doGetZip);
+      btnGetZip.addEventListener(`click`, doGetLatest);
       btnClearLog.addEventListener(`click`, event => { txtLog.value = ``; });
 
       </script>
