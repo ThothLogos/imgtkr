@@ -2,6 +2,7 @@ const fs = require(`fs`);
 const syscallSync = require(`child_process`).execSync;
 
 const datadir = `/cover-data`;
+const histdir = `${datadir}/previous_zips`;
 const zipfile = `${datadir}/testimages.zip`;
 
 /* Using fs.existsSync for now, feelin' cute, may delete later
@@ -76,6 +77,33 @@ function buildArchiveFromDir(image_dir) {
   return `${datadir}/latest.zip`;
 }
 
+function createZipHistoryDir() {
+  if (!fs.existsSync(histdir)) {
+    try { fs.mkdirSync(histdir); }
+    catch (e) { console.log(`ERROR createZipHistoryDir: ${e}`); }
+    console.log(`No zip history folder found, created ${histdir}`);
+  } else {
+    fs.readdirSync(histdir, (err, files) => {
+      if (err) { console.log(`ERROR createZipHistoryDir: ${err}`); }
+      else { console.log(`History directory holds ${files.length} previous zips.`); }
+    });
+  }
+}
+
+function archiveLatestZip(zipfile) {
+  let now = new Date(Date.now());
+  let yy  = now.getFullYear();
+  let mm  = now.getMonth() + 1;
+  let dd  = now.getDate();
+  let hr  = now.getHours();
+  let min = now.getMinutes();
+  let sec = now.getSeconds();
+  if (mm < 10) { mm = `0${mm}` } // Pad 0 for months before Oct
+  syscallSync(`cp ${zipfile} ${histdir}/${yy}-${mm}-${dd}_${hr}${min}${sec}.zip`);
+}
+
+createZipHistoryDir();
+
 console.log(`Starting Node WebSocket server on 8011...`);
 var WebSocketServer = require(`ws`).Server;
 wss = new WebSocketServer({port: 8011});
@@ -101,6 +129,8 @@ wss.on(`connection`, function(ws) {
         ws.binaryType = `blob`; // Actually nodebuffer
         console.log(`Sending latest.zip to client.`);
         ws.send(pack);
+
+        archiveLatestZip(`${datadir}/latest.zip`);
 
         // We don't need to store the raw images anymore
         syscallSync(`rm -r ${tempdir}`);
