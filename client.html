@@ -3,9 +3,7 @@
   <head><meta charset="utf-8"></head>
   <body>
     <div id="logger">
-      <textarea id="log" rows="10" cols="80">
-
-      </textarea>
+      <textarea id="log" rows="10" cols="80"></textarea>
     </div>
     <button id="btnGetZip">Request Zip</button>
     <button id="btnClearLog">Clear Log</button>
@@ -26,7 +24,7 @@
 
       function dlog(message) {
         console.log(message);
-        document.getElementById(`log`).value += `${message}\n`;
+        txtLog.value += `${message}\n`;
       }
 
       // Generate some psuedo-random image sets so we get diff zips on retries
@@ -68,6 +66,7 @@
           saveAs(msg.data, `plzwork.zip`);
           websock.send(`Client received zip.`);
           btnGetZip.disabled = false;
+          btnGetZip.addEventListener(`click`, doGetZip);
         } else {
           dlog(`Received message: ${msg.data}`);
         }

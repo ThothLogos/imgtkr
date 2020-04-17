@@ -79,29 +79,28 @@ function cleanupTempDir(tempdir) {
 }
 
 console.log("Starting Node WebSocket server on 8011...");
+var WebSocketServer = require('ws').Server;
+wss = new WebSocketServer({port: 8011});
 
-var Msg = '';
-var WebSocketServer = require('ws').Server
-    , wss = new WebSocketServer({port: 8011});
-    wss.on('connection', function(ws) {
-        ws.on('message', function(message) {
-        if (isValidJSON(message)) {
-          ws.send("Server received valid JSON from client.");
-          let imagelist = JSON.parse(message);
-          if (Array.isArray(imagelist)) {
-            console.log("Passed the isArray test, attempting processing");
-            let tempdir = createTempImageDir();
-            processImageArray(imagelist, tempdir);
-            let ziploc = buildArchiveFromDir(tempdir);
-            let pack = getImageArchive(ziploc);
-            ws.binaryType = "blob";
-            console.log(`Data packed, socket set to: ${ws.binaryType}.`);
-            console.log("Sending latest.zip to client.");
-            ws.send(pack);
-          }
-        } else {
-          console.log('Received from client: %s', message);
-          ws.send('Server received from client: ' + message);
-        }
-    });
- });
+wss.on('connection', function(ws) {
+  ws.on('message', function(message) {
+    if (isValidJSON(message)) {
+      let imagelist = JSON.parse(message);
+      if (Array.isArray(imagelist)) {
+        console.log("Passed the isArray test, attempting processing");
+        ws.send("Server attempting to process image list, please wait...");
+
+        let tempdir = createTempImageDir();
+        processImageArray(imagelist, tempdir);
+        let pack = getImageArchive(buildArchiveFromDir(tempdir));
+
+        ws.binaryType = `blob`; // Actually nodebuffer
+        console.log(`Sending latest.zip to client.`);
+        ws.send(pack);
+      }
+    } else {
+      console.log(`Received from client: ${message}`);
+      ws.send(`Server received from client: ${message}`);
+    }
+  });
+});
