@@ -51,13 +51,15 @@ function createTempImageDir() {
 }
 
 function processImageArray(imagelist, tempdir, ws) {
+  let chunks = imagelist.length;
   imagelist.forEach( image_url => {
-    console.log("Processing URL: " + image_url);
+    console.log(`Processing: ${image_url}`);
     if (isValidImageURL(image_url)) {
       let img = image_url.toString().split('/').pop();
       wgetImageURL(image_url, tempdir, img);
       console.log(`File complete: ${img}`);
-      ws.send(`Image ${img} got got.`);
+      let chunk = { request:`imagechunk`,result:`success`,file:img };
+      ws.send(JSON.stringify(chunk));
     } else {
       console.log(`ERROR isValidImageURL fail: ${image_url}`);
     }
@@ -88,12 +90,18 @@ wss.on('connection', function(ws) {
       let imagelist = JSON.parse(message);
       if (Array.isArray(imagelist)) {
         console.log("Passed the isArray test, attempting processing");
-        ws.send("Server attempting to process image list, please wait...");
+        // Tell client we got good data and expected image count
+        ws.send(JSON.stringify({request:`array`,result:`success`,size:imagelist.length}));
 
+        // wget the images and zip them up server-side (synchronous but atomic syscalls)
         let tempdir = createTempImageDir();
         processImageArray(imagelist, tempdir, ws);
         let pack = getImageArchive(buildArchiveFromDir(tempdir));
 
+        // Tell client we finished (hacky)
+        ws.send(JSON.stringify({request:`array`,result:`success`,size:0}));
+
+        // Send the zip
         ws.binaryType = `blob`; // Actually nodebuffer
         console.log(`Sending latest.zip to client.`);
         ws.send(pack);
