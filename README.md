@@ -20,6 +20,7 @@
 
   - Need to sanity-check the URL array, parse for valid URL formatting. How to handle entries that are invalid? Best-effort?
   - Need cleanup process to remove `tempdir` and images.
+  - Need to trap server's failure and do cleanup/graceful shutdown. 
   - Can we simplify the shared volume situation? Does nginx even need modification now?
   - Stress test, run the client script with hundreds of requests - try to double/triple-run before conclusion, etc.
   
@@ -31,4 +32,5 @@
 
 - __Client TODOs:__
 
+  - Handle refreshes - it kills the client end of the socket apparently? Can we trap the close/refresh and post a message to the server before we die so it can wind-down & cleanup?
   - Stress test the server with unconventional requests: very large numbers, double-sends, etc.
