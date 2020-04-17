@@ -27,10 +27,8 @@
  
 - Basic html page serving as prototype, core functionality is just maintaining the websocket connection and pushing an image URL array through. Currently has some randomization of URLs so we get a different zip each time.
 
+- Some basic GUI, added client-side console for easier output monitoring, progress bar that updates based on server's synchronous-atomic file-complete responses. Added buttons that are disabled while download is waiting for zip return.
+
 - __Client TODOs:__
 
   - Stress test the server with unconventional requests: very large numbers, double-sends, etc.
-  - Make a button and event handler to use events to fire the requests. (Can this block dupe requests before resolution?)
-  - Learn some front-end goodness, progress updates, user-feedback about process.
-  - Can we make an output window client-side for progress updates?
-  - Each `wget` on the server is currently atomic for each file, so can we send `1/30 Complete` ... `2/30 Complete` type updates to the Client?
