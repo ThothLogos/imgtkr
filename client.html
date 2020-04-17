@@ -1,22 +1,36 @@
 <!doctype html>
 <html>
   <head><meta charset="utf-8"></head>
-  <body>
+  <body style="background-color: grey">
     <div id="logger">
-      <textarea id="log" rows="10" cols="80"></textarea>
+      <textarea id="log" rows="30" cols="100" style="
+      font-family:Monospace;
+      font-size:11px;
+      background-color:slategrey;
+      white-space:pre-wrap"></textarea>
     </div>
     <button id="btnGetZip">Request Zip</button>
     <button id="btnClearLog">Clear Log</button>
+    <h4>Status:</h4>
+    <div id="progressShell" style="width: 100%;background-color:wheat;">
+      <div id="progressBar" style="width: 0%;height: 30px;background-color: green;"></div>
+    </div>
     <script type="text/javascript" src="FileSaver.js"></script>
     <script>
-      let btnGetZip   = document.getElementById(`btnGetZip`);
-      let btnClearLog = document.getElementById(`btnClearLog`);
-      let txtLog      = document.getElementById(`log`);
-      let websock     = new WebSocket(`ws://localhost:8011`);
-
+      const btnGetZip   = document.getElementById(`btnGetZip`);
+      const btnClearLog = document.getElementById(`btnClearLog`);
+      const txtLog      = document.getElementById(`log`);
+      const progressBar = document.getElementById(`progressBar`);
+      const websock     = new WebSocket(`ws://localhost:8011`);
       const url_root = `https://retailerservices.diamondcomics.com/Image/ItemMainImageLowRes`;
+
+      let imagecount = 0;
+      let currentprog = 0;
+
       txtLog.value       = ``;
       websock.binaryType = `blob`;
+
+
 
       function randomIntFromInterval(min, max) {
         return Math.floor(Math.random() * (max - min + 1) + min);
@@ -25,6 +39,11 @@
       function dlog(message) {
         console.log(message);
         txtLog.value += `${message}\n`;
+      }
+
+      function isValidJSON(str) {
+        try { JSON.parse(str); } catch (e) { return false; }
+        return true;
       }
 
       // Generate some psuedo-random image sets so we get diff zips on retries
@@ -40,7 +59,7 @@
       }
 
       function sendImageArray(imagelist) {
-        try { websock.send(JSON.stringify(imagelist)); }
+        try {websock.send(JSON.stringify(imagelist)); }
         catch (e) { dlog(`ERROR sendImageArray: ${e}`) };
       }
 
@@ -53,6 +72,10 @@
 
       function timeout(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
+      }
+      
+      function updateProgressBar(newprogress) {
+        progressBar.style.width = `${newprogress}%`;
       }
 
       websock.onopen = function(event) {
@@ -67,6 +90,27 @@
           websock.send(`Client received zip.`);
           btnGetZip.disabled = false;
           btnGetZip.addEventListener(`click`, doGetZip);
+        } else if (isValidJSON(msg.data)) {
+          //dlog(`JSON: ${msg.data}`);
+          let res = JSON.parse(msg.data);
+          if (res.request == `array` && res.result == `success`) {
+            if (res.size != 0) {
+              imagecount = res.size;
+              currentprog = 0;
+              updateProgressBar(currentprog);
+              dlog(`Now processing ${res.size} image urls server-side.`);
+            } else {
+              dlog(`Server done processing images`);
+              currentprog = 100;
+              updateProgressBar(currentprog);
+            }
+          } else if (res.request == `imagechunk` && res.result == `success`) {
+            dlog(`Image ${res.file} complete`);
+            currentprog += Math.floor(100 / imagecount);
+            updateProgressBar(currentprog);
+          } else {
+            dlog(`Unknown JSON response: ${res}`);
+          }
         } else {
           dlog(`Received message: ${msg.data}`);
         }
