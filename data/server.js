@@ -5,14 +5,6 @@ const datadir   = `/cover-data`;
 const histdir   = `${datadir}/previous_zips`;
 const latestzip = `${datadir}/latest.zip`;
 
-/* Using fs.existsSync for now, feelin' cute, may delete later
-function checkFileExistsSync(path){
-  let flag = true;
-  try { fs.accessSync(path, fs.F_OK); }
-  catch(e) { flag = false; }
-  return flag;
-} */
-
 function getImageArchive(path) {
   if (fs.existsSync(path)) {
     console.log(`Found archive at ${path}, attempting read...`);
@@ -68,7 +60,7 @@ function processImageArray(imagelist, tempdir, ws) {
 }
 
 function buildLatestZip(image_dir) {
-  console.log(`tempdir holding: ${image_dir}`)
+  console.log(`tempdir holding: ${image_dir}`);
   if (fs.existsSync(latestzip)) { fs.unlinkSync(latestzip) }
   syscallSync(`zip -urj ${latestzip} ${image_dir}/*`);
   archiveLatestZip(latestzip); // Timestamp and cp to histdir
@@ -123,7 +115,7 @@ wss = new WebSocketServer({port: 8011});
 wss.on(`connection`, function(ws) {
   ws.on(`message`, function(message) {
     if (isValidJSON(message)) {
-      let message = JSON.parse(message);
+      message = JSON.parse(message);
       if (Array.isArray(message)) {
         console.log(`Passed the isArray test, attempting processing`);
         // Tell client we got good data and expected image count
@@ -131,16 +123,19 @@ wss.on(`connection`, function(ws) {
 
         // wget the images and zip them up server-side (synchronous but atomic syscalls)
         let tempdir = createTempImageDir();
-        processImageArray(imagelist, tempdir, ws);
+        processImageArray(message, tempdir, ws);
         buildLatestZip(tempdir);
 
         // Tell client we finished & send the latest.zip
         ws.send(JSON.stringify({request:`array`,result:`success`,size:0}));
-        sendLatestZip();
+        sendLatestZip(ws);
         syscallSync(`rm -r ${tempdir}`); // We don't need to store the raw images anymore
+      } else if (message.request == `getlatest`) {
+        console.log(`Download request for latest.zip received`);
+        sendLatestZip(ws);
+      } else {
+        console.log(`Unknown JSON request received: ${message}`);
       }
-    } else if (message.request == "getlatest") {
-      sendLatestZip();
     } else {
       console.log(`Received from client: ${message}`);
       ws.send(`Server received from client: ${message}`);

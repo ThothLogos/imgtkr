@@ -66,19 +66,16 @@
       }
 
       function doGetZip() {
-        btnGetZip.removeEventListener(`click`, doGetZip);
-        btnGetZip.disabled = true;
+        disableButtons();
         dlog(`Sending image array to server.`);
         sendImageArray(generateImageArray());
       }
 
       function doGetLatest() {
-        btnGetLatest.removeEventListener(`click`, doGetLatest);
-        btnGetLatest.disabled = true;
+        disableButtons();
         dlog(`Requesting previous latest.zip from server.`);
-        try {
-          websock.send(JSON.stringify({request:`getlatest`}));
-        } catch (e) { dlog(`ERROR doGetLatest: ${e}`); }
+        try { websock.send(JSON.stringify({request:`getlatest`})); }
+        catch (e) { dlog(`ERROR doGetLatest: ${e}`); }
       }
 
       function timeout(ms) {
@@ -87,6 +84,20 @@
 
       function updateProgressBar(progress) {
         progressBar.style.width = `${progress}%`;
+      }
+
+      function disableButtons() {
+        btnGetZip.disabled = true;
+        btnGetLatest.disabled = true;
+        btnGetZip.removeEventListener(`click`, doGetZip);
+        btnGetLatest.removeEventListener(`click`, doGetLatest);
+      }
+
+      function enableButtons() {
+        btnGetZip.disabled = false;
+        btnGetLatest.disabled = false;
+        btnGetZip.addEventListener(`click`, doGetZip);
+        btnGetLatest.addEventListener(`click`, doGetLatest);
       }
 
       websock.onopen = function(event) {
@@ -99,10 +110,8 @@
           dlog(`Binary data incoming.`);
           saveAs(msg.data, `plzwork.zip`);
           websock.send(`Client received zip.`);
-          btnGetZip.disabled = false;
-          btnGetZip.addEventListener(`click`, doGetZip);
+          enableButtons();
         } else if (isValidJSON(msg.data)) {
-          //dlog(`JSON: ${msg.data}`);
           let res = JSON.parse(msg.data);
           if (res.request == `array` && res.result == `success`) {
             if (res.size != 0) {
@@ -128,7 +137,7 @@
       };
 
       btnGetZip.addEventListener(`click`, doGetZip);
-      btnGetZip.addEventListener(`click`, doGetLatest);
+      btnGetLatest.addEventListener(`click`, doGetLatest);
       btnClearLog.addEventListener(`click`, event => { txtLog.value = ``; });
 
       </script>
