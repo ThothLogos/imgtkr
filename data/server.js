@@ -89,6 +89,9 @@ function archiveLatestZip(zipfile) {
   let min = now.getMinutes();
   let sec = now.getSeconds();
   if (mm < 10) { mm = `0${mm}` } // Pad 0 for months before Oct
+  if (hr < 10) { hr = `0${hr}` } // Pad 0 for hours before 10
+  if (min < 10) { min = `0${min}` } // Pad 0
+  if (sec < 10) { sec = `0${sec}` } // Pad 0
   syscallSync(`cp ${zipfile} ${histdir}/${yy}-${mm}-${dd}_${hr}${min}${sec}.zip`);
 }
 
