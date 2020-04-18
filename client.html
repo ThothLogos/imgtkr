@@ -13,10 +13,15 @@
     <button id="btnGetLatest">Get Latest Zip</button>
     <button id="btnClearLog" style="float: right">Clear Log</button>
     <div style="width:50%">
-      <b>Progress:</b>
+      <p><b>Progress:</b></p>
       <div id="progressShell" style="width: 100%;background-color:wheat;">
         <div id="progressBar" style="width: 0%;height: 30px;background-color: green;"></div>
       </div>
+    </div>
+    <div id="counts" style="font-family: monospace;">
+     <p>Status: <span id="lblStatus">Idle</span>
+     <br>Requested: <span id="lblRequested">0</span>
+     <br>Remaining: <span id="lblRemaining">0</span></p>
     </div>
     <script type="text/javascript" src="FileSaver.js"></script>
     <script>
@@ -25,11 +30,13 @@
       const btnClearLog  = document.getElementById(`btnClearLog`);
       const txtLog       = document.getElementById(`log`);
       const progressBar  = document.getElementById(`progressBar`);
+      const lblStatus    = document.getElementById(`lblStatus`);
+      const lblRequested = document.getElementById(`lblRequested`);
+      const lblRemaining = document.getElementById(`lblRemaining`);
       const websock      = new WebSocket(`ws://localhost:8011`);
       const url_root = `https://retailerservices.diamondcomics.com/Image/ItemMainImageLowRes`;
 
-      let imagecount = 0;
-      let currentprog = 0;
+      let progress = { imagecount : 0, remaining: 0, currentprog : 0 };
 
       txtLog.value       = ``;
       websock.binaryType = `blob`;
@@ -51,10 +58,10 @@
       // Generate some psuedo-random image sets so we get diff zips on retries
       function generateImageArray() {
         let imagelist = []; // This will be sent to the server via WebSocket
-        let last3 = randomIntFromInterval(200,900);
+        let last4 = randomIntFromInterval(2000,9999);
         for(let i = 10; i > 0; i--) {
-          last3 = last3 - i;
-          let str = `${url_root}/STL060${last3}.jpg`;
+          last4 = last4 - Math.floor((i/10 + 1));
+          let str = `${url_root}/STL06${last4}.jpg`;
           imagelist.push(str);
         }
         return imagelist;
@@ -74,6 +81,7 @@
       function doGetLatest() {
         disableButtons();
         dlog(`Requesting previous latest.zip from server.`);
+        lblStatus.textContent = `Waiting on zip from server...`;
         try { websock.send(JSON.stringify({request:`getlatest`})); }
         catch (e) { dlog(`ERROR doGetLatest: ${e}`); }
       }
@@ -82,8 +90,9 @@
         return new Promise(resolve => setTimeout(resolve, ms));
       }
 
-      function updateProgressBar(progress) {
-        progressBar.style.width = `${progress}%`;
+      function updateProgress(progress) {
+        lblRemaining.textContent = `${progress.remaining}`;
+        progressBar.style.width = `${Math.floor(progress.currentprog)}%`;
       }
 
       function disableButtons() {
@@ -108,6 +117,7 @@
       websock.onmessage = function(msg) {
         if (msg.data instanceof Blob) {
           dlog(`Binary data incoming.`);
+          lblStatus.textContent = `Zip received. Idle.`;
           saveAs(msg.data, `plzwork.zip`);
           websock.send(`Client received zip.`);
           enableButtons();
@@ -115,19 +125,26 @@
           let res = JSON.parse(msg.data);
           if (res.request == `array` && res.result == `success`) {
             if (res.size != 0) {
-              imagecount = res.size;
-              currentprog = 0;
-              updateProgressBar(currentprog);
-              dlog(`  (SERVER) Processing ${res.size} image URLs.`);
+              progress.imagecount  = res.size;
+              progress.remaining   = res.size;
+              progress.currentprog = 0;
+              lblStatus.textContent = `Server received ${progress.imagecount} image URLs. Processing...`;
+              lblRequested.textContent = `${progress.imagecount}`;
+              dlog(`  (SERVER) Processing ${progress.imagecount} image URLs.`);
+              updateProgress(progress);
             } else {
               dlog(`  (SERVER) Done processing images. Sending zip.`);
-              currentprog = 100;
-              updateProgressBar(currentprog);
+              lblStatus.textContent = `Waiting on zip from server...`;
+              progress.remaining  = 0;
+              progress.currentprog = 100;
+              lblRemaining.textContent = `0`;
+              updateProgress(progress);
             }
           } else if (res.request == `imagechunk` && res.result == `success`) {
-            dlog(`  (SERVER) ${res.file} retrieved`);
-            currentprog += Math.floor(100 / imagecount);
-            updateProgressBar(currentprog);
+            progress.remaining   -= 1;
+            progress.currentprog += 100 / progress.imagecount;
+            dlog(`  (SERVER) ${res.file} retrieved, ${progress.remaining} in queue.`);
+            updateProgress(progress);
           } else {
             dlog(`Unknown JSON response: ${res}`);
           }
