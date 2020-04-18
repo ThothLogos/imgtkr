@@ -37,3 +37,38 @@
   - Add button to re-grab the latest zip that's on the server
   - Add way to access server history and select previous download
   - Stress test the server with unconventional requests: very large numbers, double-sends, etc.
+  
+### Request Structure
+  
+Client request, sending image list:
+  
+```javascript
+{
+  request : "processimagelist",
+  message : "none"
+}
+```
+Requesting latest.zip:
+
+```javascript
+}
+  request : "getlatest"
+  message : "none"
+}
+```
+
+Server responses:
+  
+```javascript
+{
+  request : "processimagelist",
+  result  : "success",
+  message : "none"
+}
+
+}
+  request : "getlatest"
+  result  : "success",
+  message : "none"
+}
+```
