@@ -12,16 +12,15 @@
     <button id="btnGetZip">Send Array (New Zip)</button>
     <button id="btnGetLatest">Get Latest Zip</button>
     <button id="btnClearLog" style="float: right">Clear Log</button>
-    <div style="width:50%">
-      <p><b>Progress:</b></p>
+    <div style="width:70%">
+      <div id="counts" style="font-family: monospace;">
+       <p>Status: <span id="lblStatus">Idle</span>
+       <br>Requested: <span id="lblRequested">0</span>
+       <br>Remaining: <span id="lblRemaining">0</span></p>
+      </div>
       <div id="progressShell" style="width: 100%;background-color:wheat;">
         <div id="progressBar" style="width: 0%;height: 30px;background-color: green;"></div>
       </div>
-    </div>
-    <div id="counts" style="font-family: monospace;">
-     <p>Status: <span id="lblStatus">Idle</span>
-     <br>Requested: <span id="lblRequested">0</span>
-     <br>Remaining: <span id="lblRemaining">0</span></p>
     </div>
     <script type="text/javascript" src="FileSaver.js"></script>
     <script>
@@ -38,8 +37,9 @@
 
       let progress = { imagecount : 0, remaining: 0, currentprog : 0 };
 
-      txtLog.value       = ``;
-      websock.binaryType = `blob`;
+      txtLog.value          = ``;
+      lblStatus.textContent = `Offline. Idle.`;
+      websock.binaryType    = `blob`;
 
       function randomIntFromInterval(min, max) {
         return Math.floor(Math.random() * (max - min + 1) + min);
@@ -60,8 +60,8 @@
       function generateImageArray() {
         let imagelist = []; // This will be sent to the server via WebSocket
         let last4 = randomIntFromInterval(2000,9999);
-        for(let i = 10; i > 0; i--) {
-          last4 = last4 - Math.floor((i/10 + 1));
+        for(let i = 7; i > 0; i--) {
+          last4 = last4 - Math.floor((i/100 + 1));
           let str = `${url_root}/STL06${last4}.jpg`;
           imagelist.push(str);
         }
@@ -112,6 +112,7 @@
 
       websock.onopen = function(event) {
         dlog(`WebSocket is now open.`);
+        lblStatus.textContent = `Connected to image server. Idle.`;
         websock.send(`Is there anybody out there?`);
       };
 
