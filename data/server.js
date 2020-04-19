@@ -15,11 +15,12 @@ const xmag = `\x1b[35m`;
 const xcyn = `\x1b[36m`;
 const xwht = `\x1b[37m`;
 
+// Color Logging - Error, Warn, Job, Message, Setup
 function elog(src, err) { console.log(`[ ${xred}${xbld}!!${xrst} ${xred}ERROR${xrst} ] ${src}: ${err}`);}
 function wlog(src, wrn) { console.log(`[ ${xylw}${xbld}!!${xrst} ${xylw}WARN${xrst} ] ${src}: ${wrn}`); }
 function jlog(src, msg) { console.log(`[ ${xmag} JOB ${xrst} ] ${src}: ${msg}`); }
 function mlog(src, msg) { console.log(`[${xcyn}MESSAGE${xrst}] ${src}: ${msg}`); }
-function setuplog(src, msg)  { console.log(`[ ${xgrn}SETUP${xrst} ] ${src}: ${msg}`); }
+function setuplog(src, msg) { console.log(`[ ${xgrn}SETUP${xrst} ] ${src}: ${msg}`); }
 
 function getDateName() {
   let now = new Date(Date.now());
@@ -85,7 +86,7 @@ function processImageArray(imagelist, tempdir, ws) {
         ws.send(JSON.stringify(chunk));
       }
     } else {
-      elog(`isValidImageURL`, image_url);
+      elog(`isValidImageURL`, `Failed to pass URL regex: ${image_url}`);
     }
   });
   jlog(`${xbld}${xgrn}Complete${xrst}`, `Downloaded images saved to temp directory ${tempdir}`);
@@ -139,7 +140,6 @@ function sendLatestZip(ws) {
   jlog(`sendLatestZip`, `Sending ${latestzip} to client.`);
   ws.send(pack);
 }
-
 
 setuplog(`${xbld}${xwht}STARTUP${xrst}`, `Starting Node WebSocket server on 8011...`);
 var WebSocketServer = require(`ws`).Server;
