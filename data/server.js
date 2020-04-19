@@ -15,6 +15,23 @@ const xmag = `\x1b[35m`;
 const xcyn = `\x1b[36m`;
 const xwht = `\x1b[37m`;
 
+function elog(src, err) { console.log(`[ ${xred}${xbld}!!${xrst} ${xred}ERROR${xrst} ] ${src}: ${err}`);}
+function wlog(src, wrn) { console.log(`[ ${xylw}${xbld}!!${xrst} ${xylw}WARN${xrst} ] ${src}: ${wrn}`); }
+function jlog(src, msg) { console.log(`[ ${xmag} JOB ${xrst} ] ${src}: ${msg}`); }
+function mlog(src, msg) { console.log(`[${xcyn}MESSAGE${xrst}] ${src}: ${msg}`); }
+function setuplog(src, msg)  { console.log(`[ ${xgrn}SETUP${xrst} ] ${src}: ${msg}`); }
+
+function getDateName() {
+  let now = new Date(Date.now());
+  let yy  = now.getFullYear();
+  let mm  = now.getMonth() + 1 < 10 ? `0${now.getMonth()+1}` : now.getMonth() + 1;
+  let dd  = now.getDate()      < 10 ? `0${now.getDate()}`    : now.getDate();
+  let hr  = now.getHours()     < 10 ? `0${now.getHours()}`   : now.getHours();
+  let min = now.getMinutes()   < 10 ? `0${now.getMinutes()}` : now.getMinutes();
+  let sec = now.getSeconds()   < 10 ? `0${now.getSeconds()}` : now.getSeconds();
+  return `${yy}-${mm}-${dd}_${hr}${min}${sec}`
+}
+
 function isValidJSON(str) {
   try { JSON.parse(str); }
   catch (e) { return false; }
@@ -22,7 +39,7 @@ function isValidJSON(str) {
 }
 
 function isValidImageURL(image_url) {
-  return /^(?:\w+:)?\/\/([^\s\.]+\.\S{2}|localhost[\:?\d]*)\S*$/.test(image_url)
+  return /^(?:\w+:)?\/\/([^\s\.]+\.\S{2}|localhost[\:?\d]*)\S*$/.test(image_url);
 }
 
 function getImageArchive(path) {
@@ -103,18 +120,7 @@ function createZipHistoryDir() {
 }
 
 function archiveLatestZip(zipfile) {
-  let now = new Date(Date.now());
-  let yy  = now.getFullYear();
-  let mm  = now.getMonth() + 1;
-  let dd  = now.getDate();
-  let hr  = now.getHours();
-  let min = now.getMinutes();
-  let sec = now.getSeconds();
-  if (mm < 10) { mm = `0${mm}` } // Pad 0 for months before Oct
-  if (hr < 10) { hr = `0${hr}` } // Pad 0 for hours before 10
-  if (min < 10) { min = `0${min}` } // Pad 0
-  if (sec < 10) { sec = `0${sec}` } // Pad 0
-  let datename = `${yy}-${mm}-${dd}_${hr}${min}${sec}`
+  let datename = getDateName();
   jlog(`archiveLatestZip`, `Copying ${latestzip} to archive as ${histdir}/${datename}.zip`);
   try { syscallSync(`cp ${zipfile} ${histdir}/${datename}.zip`); }
   catch (e) { elog(`archiveLatestZip`, e); }
@@ -133,20 +139,6 @@ function sendLatestZip(ws) {
   jlog(`sendLatestZip`, `Sending ${latestzip} to client.`);
   ws.send(pack);
 }
-
-function elog(src, err) {
-  let dubs = `${xred}${xbld}!!${xrst}`;
-  console.log(`[ ${dubs} ${xred}ERROR${xrst} ] ${src}: ${err}`);
-}
-
-function wlog(src, wrn) {
-  let dubs = `${xylw}${xbld}!!${xrst}`;
-  console.log(`[ ${dubs} ${xylw}WARN${xrst} ] ${src}: ${wrn}`);
-}
-
-function setuplog(src, msg)  { console.log(`[ ${xgrn}SETUP${xrst} ] ${src}: ${msg}`); }
-function jlog(src, msg) { console.log(`[ ${xmag} JOB ${xrst} ] ${src}: ${msg}`); }
-function mlog(src, msg) { console.log(`[${xcyn}MESSAGE${xrst}] ${src}: ${msg}`); }
 
 
 setuplog(`${xbld}${xwht}STARTUP${xrst}`, `Starting Node WebSocket server on 8011...`);
