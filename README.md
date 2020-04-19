@@ -2,7 +2,7 @@
 
 ### Server-side
 
-- 4th container added to the stack - mostly default `node:12.16.2-alpine3.9` image with some additions: `zip` and `npm install ws` (websocket lib).
+- 4th container added to the stack - mostly default `node:12.16.2-alpine3.9` image with some additions: `zip`, `curl` and `npm install ws` (websocket lib).
 
 - Nginx confs modified to set up proxy_pass to websocket server on port `8011`.
 
@@ -11,14 +11,13 @@
 - Current getImages() process: 
 
   - create a `tempdir` named with a unix-timestamp of Date.now()
-  - iterate over the URL array, do synchronous syscall to `wget` for each item, write to `tempdir`
+  - iterate over the URL array, do synchronous syscall to `curl` for each item, write to `tempdir`
   - synchronous syscall to `zip` to package all image files into a zip, placed in `/cover-data` (shared volume)
   - do syncrhonous `fs.readFileSync()` on the finished zip, prep binary data for transfer
   - set `ws.binaryType = 'blob'`, perform `websocket.send()` to push zipfile to client
   
 - __Server TODOs:__
 
-  - Add JSON parse message for a "getlatest" from the client. Allow client to re-download the last archive.
   - Allow client to request a specific historic zip by name
   - Need to trap server's failure and do cleanup/graceful shutdown.
   - Need to manage and prune the zip history folder - keep last n.
@@ -34,7 +33,6 @@
 - __Client TODOs:__
 
   - Handle refreshes - it kills the client end of the socket apparently? Can we trap the close/refresh and post a message to the server before we die so it can wind-down & cleanup?
-  - Add button to re-grab the latest zip that's on the server
   - Add way to access server history and select previous download
   - Stress test the server with unconventional requests: very large numbers, double-sends, etc.
   
