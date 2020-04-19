@@ -7,7 +7,7 @@ const latestzip = `${datadir}/latest.zip`;
 
 function getImageArchive(path) {
   if (fs.existsSync(path)) {
-    console.log(`Found archive at ${path}, attempting read...`);
+    console.log(`[JOB - PACK] Found archive at ${path}, attempting read...`);
     return fs.readFileSync(path);
   } else {
     console.log(`ERROR - could not locate ${path}`);
@@ -28,8 +28,9 @@ function wgetImageURL(image_url, dir, img) {
   if (fs.existsSync(`${dir}/${img}`)) { // Prevent duplicates
     console.log (`WARN: wgetImageURL skipped for ${img}, already exists.`);
   } else {
-    try { syscallSync(`wget ${image_url} -P ${dir}/`); }
-    catch (e) { console.log(`ERROR wgetImageURL fail: ${e}`); }
+    //try { syscallSync(`wget ${image_url} -P ${dir}/`); }
+    try { syscallSync(`curl -s -o ${dir}/${img} ${image_url}`); }
+    catch (e) { console.log(`ERROR wgetImageURL: ${e}`); }
   }
 }
 
@@ -37,45 +38,51 @@ function createTempImageDir() {
   let now = Date.now();
   if (!fs.existsSync(`${datadir}/${now}`)){
     try { fs.mkdirSync(`${datadir}/${now}`); }
-    catch (e) { console.log(`ERROR createTempImageDir fail: ${e}`); }
-    console.log(`Created directory: ${datadir}/${now}`);
+    catch (e) { console.log(`ERROR createTempImageDir: ${e}`); }
+    console.log(`[JOB - PREP] Created temporary processing directory: ${datadir}/${now}`);
   }
   return `${datadir}/${now}`;
 }
 
 function processImageArray(imagelist, tempdir, ws) {
   let chunks = imagelist.length;
+  console.log(`\n[JOB - GET] Attempting to download images...`);
   imagelist.forEach( image_url => {
-    console.log(`Processing: ${image_url}`);
+    console.log(`[JOB - GET] Target: ${image_url}`);
     if (isValidImageURL(image_url)) {
       let img = image_url.toString().split(`/`).pop();
       wgetImageURL(image_url, tempdir, img);
-      console.log(`File complete: ${img}`);
+      console.log(`[JOB - GET] ${img} complete.`);
       let chunk = { request:`imagechunk`,result:`success`,file:img };
       ws.send(JSON.stringify(chunk));
     } else {
-      console.log(`ERROR isValidImageURL fail: ${image_url}`);
+      console.log(`ERROR isValidImageURL: ${image_url}`);
     }
   });
+  console.log(`[JOB - GET] Downloads complete; images saved to temp directory ${tempdir}\n`);
 }
 
 function buildLatestZip(image_dir) {
-  console.log(`tempdir holding: ${image_dir}`);
-  if (fs.existsSync(latestzip)) { fs.unlinkSync(latestzip) }
-  syscallSync(`zip -urj ${latestzip} ${image_dir}/*`);
+  if (fs.existsSync(latestzip)) fs.unlinkSync(latestzip);
+  console.log(`[JOB - ZIP] Compressing contents of ${image_dir} to ${latestzip}`)
+  try {
+    syscallSync(`zip -urj ${latestzip} ${image_dir}/*`);
+  } catch (e) {
+    console.log(`ERROR buildLatestZip: ${e}`);
+  }
   archiveLatestZip(latestzip); // Timestamp and cp to histdir
-  if (fs.existsSync(latestzip)) { console.log(`${latestzip} created`); }
+  if (fs.existsSync(latestzip)) console.log(`[JOB - ZIP] ${latestzip} created`);
 }
 
 function createZipHistoryDir() {
   if (!fs.existsSync(histdir)) {
     try { fs.mkdirSync(histdir); }
     catch (e) { console.log(`ERROR createZipHistoryDir: ${e}`); }
-    console.log(`No zip history folder found, created ${histdir}`);
+    console.log(`[SETUP] No zip history folder found, created ${histdir}`);
   } else {
     fs.readdirSync(histdir, (err, files) => {
       if (err) { console.log(`ERROR createZipHistoryDir: ${err}`); }
-      else { console.log(`History directory holds ${files.length} previous zips.`); }
+      else { console.log(`[INFO] History directory holds ${files.length} previous zips.`); }
     });
   }
 }
@@ -92,7 +99,9 @@ function archiveLatestZip(zipfile) {
   if (hr < 10) { hr = `0${hr}` } // Pad 0 for hours before 10
   if (min < 10) { min = `0${min}` } // Pad 0
   if (sec < 10) { sec = `0${sec}` } // Pad 0
-  syscallSync(`cp ${zipfile} ${histdir}/${yy}-${mm}-${dd}_${hr}${min}${sec}.zip`);
+  let datename = `${yy}-${mm}-${dd}_${hr}${min}${sec}`
+  console.log(`[JOB - ZIP] Copying ${latestzip} to archive as ${datename}.zip`);
+  syscallSync(`cp ${zipfile} ${histdir}/${datename}.zip`);
 }
 
 function getHistoryList() {
@@ -105,13 +114,13 @@ function getHistoryList() {
 function sendLatestZip(ws) {
   let pack = getImageArchive(latestzip);
   ws.binaryType = `blob`; // Actually nodebuffer
-  console.log(`Sending latest.zip to client.`);
+  console.log(`[JOB - XMIT] Sending latest.zip to client.`);
   ws.send(pack);
 }
 
 createZipHistoryDir();
 
-console.log(`Starting Node WebSocket server on 8011...`);
+console.log(`[SETUP] Starting Node WebSocket server on 8011...`);
 var WebSocketServer = require(`ws`).Server;
 wss = new WebSocketServer({port: 8011});
 
@@ -120,7 +129,7 @@ wss.on(`connection`, function(ws) {
     if (isValidJSON(message)) {
       message = JSON.parse(message);
       if (Array.isArray(message)) {
-        console.log(`Passed the isArray test, attempting processing`);
+        console.log(`\n[JOB - REQUEST] Received Array from client, attempting to process image URLs`);
         // Tell client we got good data and expected image count
         ws.send(JSON.stringify({request:`array`,result:`success`,size:message.length}));
 
@@ -134,14 +143,17 @@ wss.on(`connection`, function(ws) {
         sendLatestZip(ws);
         syscallSync(`rm -r ${tempdir}`); // We don't need to store the raw images anymore
       } else if (message.request == `getlatest`) {
-        console.log(`Download request for latest.zip received`);
+        console.log(`\n[JOB - REQUEST] Download request for latest.zip received`);
         sendLatestZip(ws);
       } else {
         console.log(`Unknown JSON request received: ${message}`);
       }
     } else {
-      console.log(`Received from client: ${message}`);
+      console.log(`[MESSAGE] Received from client: ${message}`);
       ws.send(`Server received from client: ${message}`);
     }
+  });
+  ws.on(`close`, function () {
+    console.log(`Connection with client closed.`);
   });
 });
