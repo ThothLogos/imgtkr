@@ -1,9 +1,9 @@
 const fs = require(`fs`);
 const syscallSync = require(`child_process`).execSync;
 
-const datadir   = `/cover-data`;
-const histdir   = `${datadir}/previous_zips`;
-const latestzip = `${datadir}/latest.zip`;
+const DATADIR   = `/cover-data`;
+const HISTDIR   = `${DATADIR}/previous_zips`;
+const LATESTZIP = `${DATADIR}/latest.zip`;
 
 const xrst = `\x1b[0m`;
 const xbld = `\x1b[1m`;
@@ -65,12 +65,12 @@ function curlImageURL(image_url, dir, img) {
 
 function createTempImageDir() {
   let now = Date.now();
-  if (!fs.existsSync(`${datadir}/${now}`)){
-    try { fs.mkdirSync(`${datadir}/${now}`); }
+  if (!fs.existsSync(`${DATADIR}/${now}`)){
+    try { fs.mkdirSync(`${DATADIR}/${now}`); }
     catch (e) { elog(`createTempImageDir`, e); }
-    jlog(`createTempImageDir`, `Created temporary processing directory: ${datadir}/${now}`);
+    jlog(`createTempImageDir`, `Created temporary processing directory: ${DATADIR}/${now}`);
   }
-  return `${datadir}/${now}`;
+  return `${DATADIR}/${now}`;
 }
 
 function processImageArray(imagelist, tempdir, ws) {
@@ -93,27 +93,27 @@ function processImageArray(imagelist, tempdir, ws) {
 }
 
 function buildLatestZip(image_dir) {
-  if (fs.existsSync(latestzip)) fs.unlinkSync(latestzip);
-  jlog(`buildLatestZip`, `Compressing contents of ${image_dir} to ${latestzip}`);
+  if (fs.existsSync(LATESTZIP)) fs.unlinkSync(LATESTZIP);
+  jlog(`buildLatestZip`, `Compressing contents of ${image_dir} to ${LATESTZIP}`);
   try {
-    syscallSync(`zip -urj ${latestzip} ${image_dir}/*`);
+    syscallSync(`zip -urj ${LATESTZIP} ${image_dir}/*`);
   } catch (e) {
     elog(`buildLatestZip`, e);
   }
-  if (fs.existsSync(latestzip)) {
-    archiveLatestZip(latestzip); // Timestamp and cp to histdir
+  if (fs.existsSync(LATESTZIP)) {
+    archiveLatestZip(LATESTZIP); // Timestamp and cp to HISTDIR
   } else {
-    elog(`buildLatestZip`, `Failed to verify ${latestzip} existence for archival!`);
+    elog(`buildLatestZip`, `Failed to verify ${LATESTZIP} existence for archival!`);
   }
 }
 
 function createZipHistoryDir() {
-  if (!fs.existsSync(histdir)) {
-    try { fs.mkdirSync(histdir); }
+  if (!fs.existsSync(HISTDIR)) {
+    try { fs.mkdirSync(HISTDIR); }
     catch (e) { elog(`createZipHistoryDir`, e); }
-    setuplog(`createZipHistoryDir`, `No zip history folder found, created ${histdir}`);
+    setuplog(`createZipHistoryDir`, `No zip history folder found, created ${HISTDIR}`);
   } else {
-    fs.readdirSync(histdir, (err, files) => {
+    fs.readdirSync(HISTDIR, (err, files) => {
       if (err) { elog(`createZipHistoryDir`, err); }
       else { setuplog(`createZipHistoryDir`, `History directory holds ${files.length} previous zips.`); }
     });
@@ -122,22 +122,22 @@ function createZipHistoryDir() {
 
 function archiveLatestZip(zipfile) {
   let datename = getDateName();
-  jlog(`archiveLatestZip`, `Copying ${latestzip} to archive as ${histdir}/${datename}.zip`);
-  try { syscallSync(`cp ${zipfile} ${histdir}/${datename}.zip`); }
+  jlog(`archiveLatestZip`, `Copying ${LATESTZIP} to archive as ${HISTDIR}/${datename}.zip`);
+  try { syscallSync(`cp ${zipfile} ${HISTDIR}/${datename}.zip`); }
   catch (e) { elog(`archiveLatestZip`, e); }
 }
 
 function getHistoryList() {
-  fs.readdirSync(histdir, (err, files) => {
+  fs.readdirSync(HISTDIR, (err, files) => {
     if (err) { elog(`getHistoryList`, err); }
     else { return files; }
   });
 }
 
 function sendLatestZip(ws) {
-  let pack = getImageArchive(latestzip);
+  let pack = getImageArchive(LATESTZIP);
   ws.binaryType = `blob`; // Actually nodebuffer
-  jlog(`sendLatestZip`, `Sending ${latestzip} to client.`);
+  jlog(`sendLatestZip`, `Sending ${LATESTZIP} to client.`);
   ws.send(pack);
 }
 
