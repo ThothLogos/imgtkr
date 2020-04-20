@@ -4,6 +4,7 @@ const syscallSync = require(`child_process`).execSync;
 const DATADIR   = `/cover-data`;
 const HISTDIR   = `${DATADIR}/previous_zips`;
 const LATESTZIP = `${DATADIR}/latest.zip`;
+const MAXHIST   = 12;
 
 const xrst = `\x1b[0m`;
 const xbld = `\x1b[1m`;
@@ -20,6 +21,7 @@ function elog(src, err) { console.log(`[ ${xred}${xbld}!!${xrst} ${xred}ERROR${x
 function wlog(src, wrn) { console.log(`[ ${xylw}${xbld}!!${xrst} ${xylw}WARN${xrst} ] ${src}: ${wrn}`); }
 function jlog(src, msg) { console.log(`[ ${xmag} JOB ${xrst} ] ${src}: ${msg}`); }
 function mlog(src, msg) { console.log(`[${xcyn}MESSAGE${xrst}] ${src}: ${msg}`); }
+function cleanuplog(src, msg) { console.log(`[ ${xylw}CLEAN${xrst} ] ${src}: ${msg}`); }
 function setuplog(src, msg) { console.log(`[ ${xgrn}SETUP${xrst} ] ${src}: ${msg}`); }
 
 function getDateName() {
@@ -89,7 +91,7 @@ function processImageArray(imagelist, tempdir, ws) {
       elog(`isValidImageURL`, `Failed to pass URL regex: ${image_url}`);
     }
   });
-  jlog(`${xbld}${xgrn}Complete${xrst}`, `Downloaded images saved to temp directory ${tempdir}`);
+  jlog(`processImageArray`, `${xgrn}Complete${xrst} - Downloaded images saved ${tempdir}`);
 }
 
 function buildLatestZip(image_dir) {
@@ -102,21 +104,23 @@ function buildLatestZip(image_dir) {
   }
   if (fs.existsSync(LATESTZIP)) {
     archiveLatestZip(LATESTZIP); // Timestamp and cp to HISTDIR
+    pruneZipHistoryDir(fs.readdirSync(HISTDIR)); // Prune the zip history when we add a new one
   } else {
     elog(`buildLatestZip`, `Failed to verify ${LATESTZIP} existence for archival!`);
   }
 }
 
-function createZipHistoryDir() {
+function initializeZipHistoryDir() {
   if (!fs.existsSync(HISTDIR)) {
     try { fs.mkdirSync(HISTDIR); }
-    catch (e) { elog(`createZipHistoryDir`, e); }
-    setuplog(`createZipHistoryDir`, `No zip history folder found, created ${HISTDIR}`);
+    catch (e) { elog(`initializeZipHistoryDir`, e); }
+    setuplog(`initializeZipHistoryDir`, `No zip history folder found, created ${HISTDIR}`);
   } else {
-    fs.readdirSync(HISTDIR, (err, files) => {
-      if (err) { elog(`createZipHistoryDir`, err); }
-      else { setuplog(`createZipHistoryDir`, `History directory holds ${files.length} previous zips.`); }
-    });
+    try {
+      let files = fs.readdirSync(HISTDIR);
+      setuplog(`initializeZipHistoryDir`, `History directory holds ${files.length} previous zips.`);
+      pruneZipHistoryDir(files);
+    } catch (e) { elog(`initializeZipHistoryDir`, e); }
   }
 }
 
@@ -127,13 +131,6 @@ function archiveLatestZip(zipfile) {
   catch (e) { elog(`archiveLatestZip`, e); }
 }
 
-function getHistoryList() {
-  fs.readdirSync(HISTDIR, (err, files) => {
-    if (err) { elog(`getHistoryList`, err); }
-    else { return files; }
-  });
-}
-
 function sendLatestZip(ws) {
   let pack = getImageArchive(LATESTZIP);
   ws.binaryType = `blob`; // Actually nodebuffer
@@ -141,11 +138,44 @@ function sendLatestZip(ws) {
   ws.send(pack);
 }
 
+function getOldestHistZip(files) {
+  let oldest = files[0];
+  files.forEach( file => {
+    let fmtime = fs.statSync(`${HISTDIR}/${file}`);
+    let omtime = fs.statSync(`${HISTDIR}/${oldest}`);
+    if (Date.parse(fmtime) < Date.parse(omtime)) {
+      oldest = file; // We found a new oldest
+    }
+  });
+  return oldest;
+}
+
+function pruneZipHistoryDir(files) {
+  if (files.length > MAXHIST) {
+    cleanuplog(`pruneZipHistoryDir`, `Removing oldest zips down to MAXHIST (${MAXHIST})`);
+    for (let i = files.length; i > MAXHIST; i--) {
+      let oldest = getOldestHistZip(files);
+      try {
+        syscallSync(`rm ${HISTDIR}/${oldest}`);
+        files.splice(files.indexOf(oldest), 1); // We nuked the file, now remove from the array
+        cleanuplog(`pruneZipHistoryDir`, `Removed ${oldest}`);
+      } catch (e) { elog(`pruneZipHistoryDir`, e); }   
+    }
+    cleanuplog(`pruneZipHistoryDir`, `${xgrn}Complete${xrst} - Pruned ${HISTDIR} down to ${MAXHIST}`);
+  }
+}
+
+function removeTempImageDir(tempdir) {
+  try {
+    syscallSync(`rm -r ${tempdir}`);
+    cleanuplog(`removeTempImageDir`, `Removed temporary directory ${tempdir}`);
+  } catch (e) { elog(`removeTempImageDir`, e); }
+}
+
 setuplog(`${xbld}${xwht}STARTUP${xrst}`, `Starting Node WebSocket server on 8011...`);
 var WebSocketServer = require(`ws`).Server;
 wss = new WebSocketServer({port: 8011});
-
-createZipHistoryDir();
+initializeZipHistoryDir();
 
 wss.on(`connection`, function(ws) {
   ws.on(`message`, function(message) {
@@ -164,7 +194,7 @@ wss.on(`connection`, function(ws) {
         // Tell client we finished & send the latest.zip
         ws.send(JSON.stringify({request:`array`,result:`success`,size:0}));
         sendLatestZip(ws);
-        syscallSync(`rm -r ${tempdir}`); // We don't need to store the raw images anymore
+        removeTempImageDir(tempdir); // We don't need to store the raw images anymore
       } else if (message.request == `getlatest`) {
         jlog(`${xbld}${xylw}NEW ${xrst}${xwht}Request${xrst}`, `sendLatestZip`);
         sendLatestZip(ws);
