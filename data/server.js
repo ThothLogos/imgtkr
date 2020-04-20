@@ -16,13 +16,13 @@ const xmag = `\x1b[35m`;
 const xcyn = `\x1b[36m`;
 const xwht = `\x1b[37m`;
 
-// Color Logging - Error, Warn, Job, Message, Setup
+// Color Logging - Error, Warn, Job, Message, Cleanup, Setup
 function elog(src, err) { console.log(`[ ${xred}${xbld}!!${xrst} ${xred}ERROR${xrst} ] ${src}: ${err}`);}
 function wlog(src, wrn) { console.log(`[ ${xylw}${xbld}!!${xrst} ${xylw}WARN${xrst} ] ${src}: ${wrn}`); }
 function jlog(src, msg) { console.log(`[ ${xmag} JOB ${xrst} ] ${src}: ${msg}`); }
 function mlog(src, msg) { console.log(`[${xcyn}MESSAGE${xrst}] ${src}: ${msg}`); }
 function cleanuplog(src, msg) { console.log(`[ ${xylw}CLEAN${xrst} ] ${src}: ${msg}`); }
-function setuplog(src, msg) { console.log(`[ ${xgrn}SETUP${xrst} ] ${src}: ${msg}`); }
+function statuslog(src, msg) { console.log(`[ ${xblu}STATE${xrst} ] ${src}: ${msg}`); }
 
 function getDateName() {
   let now = new Date(Date.now());
@@ -114,11 +114,11 @@ function initializeZipHistoryDir() {
   if (!fs.existsSync(HISTDIR)) {
     try { fs.mkdirSync(HISTDIR); }
     catch (e) { elog(`initializeZipHistoryDir`, e); }
-    setuplog(`initializeZipHistoryDir`, `No zip history folder found, created ${HISTDIR}`);
+    statuslog(`initializeZipHistoryDir`, `No zip history folder found, created ${HISTDIR}`);
   } else {
     try {
       let files = fs.readdirSync(HISTDIR);
-      setuplog(`initializeZipHistoryDir`, `History directory holds ${files.length} previous zips.`);
+      statuslog(`initializeZipHistoryDir`, `History directory holds ${files.length} previous zips.`);
       pruneZipHistoryDir(files);
     } catch (e) { elog(`initializeZipHistoryDir`, e); }
   }
@@ -172,7 +172,7 @@ function removeTempImageDir(tempdir) {
   } catch (e) { elog(`removeTempImageDir`, e); }
 }
 
-setuplog(`${xbld}${xwht}STARTUP${xrst}`, `Starting Node WebSocket server on 8011...`);
+statuslog(`${xbld}${xwht}STARTUP${xrst}`, `Starting Node WebSocket server on 8011...`);
 var WebSocketServer = require(`ws`).Server;
 wss = new WebSocketServer({port: 8011});
 initializeZipHistoryDir();
@@ -207,6 +207,6 @@ wss.on(`connection`, function(ws) {
     }
   });
   ws.on(`close`, function () {
-    console.log(`Connection with client closed.`);
+    statuslog(`socketConnection`, `Connection with client closed.`);
   });
 });
