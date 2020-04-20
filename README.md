@@ -15,12 +15,12 @@
   - synchronous syscall to `zip` to package all image files into a zip, placed in `/cover-data` (shared volume)
   - do syncrhonous `fs.readFileSync()` on the finished zip, prep binary data for transfer
   - set `ws.binaryType = 'blob'`, perform `websocket.send()` to push zipfile to client
+  - auto-cleanup relies on `MAXHIST` to determine how many previous zips to keep, runs when new zips are made and server start
   
 - __Server TODOs:__
 
   - Allow client to request a specific historic zip by name
   - Need to trap server's failure and do cleanup/graceful shutdown.
-  - Need to manage and prune the zip history folder - keep last n.
   - Can we simplify the shared volume situation? Does nginx even need modification now?
   - Stress test, run the client script with hundreds of requests - try to double/triple-run before conclusion, etc.
   
