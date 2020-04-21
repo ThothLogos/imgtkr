@@ -6,16 +6,25 @@
 
 - Nginx confs modified to set up proxy_pass to websocket server on port `8011`.
 
-- `server.js` listens on `nodews` container at `8011`, any messages passed to the server are checked to see if `Array.isArray(message)` passes - if so, it is treated as an array of Image URLs to go fetch. Otherwise, it attempts to parse JSON for other requests, like a message or re-download request.
+- `server.js` listens on `nodews` container at `8011`, any messages passed to the server are checked for their `message.request` property, which contain procotol keywords to trigger and track server-side events.
 
-- Current process for handling the image Array:
+- A new data type known as the "skurl" has been born to reference such a construction:
+
+```javascript
+let skurl = { sku : "SKU123098", url : "https://img.example.com/images/somepic0001.jpg" };
+```
+
+- Current process for handling the `processSkurls` request type:
 
   - create a temporary directory named with a unix-timestamp
   - do asynchronous calls to `curl` for each image, using a `setTimeout` promise to rate-limit
-  - synchronous syscall to `zip` to package all image files into a zip, placed in `/cover-data` (shared volume)
+  - use regex capture on each `url` to get the `file_ext` ie jpg, png, etc
+  - use the `skurl.sku` property with the `file_ext` to rename files to `${skurl.sku}.${file_ext}`. This happens during the `curl` call, `curl` writes the files using the new constructed name.
+  - only after all `curl` calls return, perform synchronous syscall to `zip` to package all image files into a zip, placed in `/cover-data` (which currently is a docker shared volume, this may be a deprecated dependency)
   - do `fs.readFileSync()` on the finished zip, prep binary data for transfer
-  - set `ws.binaryType = 'blob'`, perform `websocket.send()` to push zipfile to client
-  - auto-cleanup relies on `MAXHIST` to determine how many previous zips to keep, runs when new zips are made and server start
+  - set `ws.binaryType = 'blob'`
+  - perform `websocket.send()` to push zipfile to client
+  - perform auto-cleanup using `const MAXHIST` to determine how many historical zips to keep. This runs when any new zips are made and during server startup.
   
 - __Server TODOs:__
 
@@ -27,9 +36,9 @@
   
  ### Client-side
  
-- Basic html page serving as prototype, core functionality is just maintaining the websocket connection and pushing an image URL array through. Currently has some randomization of URLs so we get a different zip each time.
+- Basic html page serving as prototype, core functionality is just maintaining the websocket connection and pushing a properly formatted request to the server. The test `client.html` generates dummy skurls for development uses.
 
-- Some basic GUI, added client-side console for easier output monitoring, progress bar that updates based on server's synchronous-atomic file-complete responses. Added buttons that are disabled while download is waiting for zip return.
+- Some basic GUI, added client-side console for easier output monitoring, progress bar that updates based on server's `imagechunk` responses. Added buttons that are disabled while download is waiting for zip return.
 
 - __Client TODOs:__
 
