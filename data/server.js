@@ -64,17 +64,6 @@ function getImageArchive(path) {
   }
 }
 
-function curlImageURL(image_url, dir, img) {
-  if (fs.existsSync(`${dir}/${img}`)) { // Prevent duplicates
-    wlog(`curlImageURL`, `skipping ${img}, already exists in ${dir}`);
-    return false;
-  } else {
-    try { syscallSync(`curl -s -o ${dir}/${img} ${image_url}`); }
-    catch (e) { elog(`curlImageURL`, e); }
-    return true;
-  }
-}
-
 function createTempImageDir() {
   let now = Date.now();
   if (!fs.existsSync(`${DATADIR}/${now}`)){
