@@ -58,6 +58,21 @@
         return true;
       }
 
+      function genImageListRequest() {
+        let skurls = [];
+
+        // Generate some test URLs from Diamond Comics
+        // and some fake SKUs we just make up
+        let last4 = randomIntFromInterval(5000,9999);
+        for(let i = 105; i > 0; i--) {
+          let urlref = `${url_root}/STL06${last4}.jpg`;
+          let skuname = `SKU${randomIntFromInterval(100000000, 99999999)}`;
+          last4 -= 1;
+          skurls.push( { sku: skuname, url: urlref } );
+        }
+        return { request : "processImageList", data: skurls };
+      }
+
       // Generate some psuedo-random image sets so we get diff zips on retries
       function generateImageArray() {
         let imagelist = []; // This will be sent to the server via WebSocket
@@ -79,7 +94,12 @@
       function doGetZip() {
         disableButtons();
         dlog(`Sending image array to server.`);
-        sendImageArray(generateImageArray());
+
+        // Commented out this is the Array.isArray() old method
+        //sendImageArray(generateImageArray());
+
+        try { websock.send(JSON.stringify(genImageListRequest()));
+        } catch (e) { dlog(`ERROR genImageListRequest send failed! ${e}`); }
       }
 
       function doGetLatest() {
