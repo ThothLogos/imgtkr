@@ -7,8 +7,8 @@ const DATADIR   = `/cover-data`;
 const HISTDIR   = `${DATADIR}/previous_zips`;
 const LATESTZIP = `${DATADIR}/latest.zip`;
 const MAXHIST   = 12;
-const BATCHSIZE = 20;
-const BATCHTIME = 850;
+const BATCHSIZE = 30;
+const BATCHTIME = 1250;
 
 const rst = `\x1b[0m`;
 const bld = `\x1b[1m`;
@@ -165,7 +165,7 @@ function pruneHistoryDir(files) {
         syscallSync(`rm ${HISTDIR}/${oldest}`);
         files.splice(files.indexOf(oldest), 1); // We nuked the file, now remove from the array
         cleanuplog(`pruneHistoryDir`, `Removed ${oldest}`);
-      } catch (e) { elog(`pruneHistoryDir`, e); }   
+      } catch (e) { elog(`pruneHistoryDir`, e); }
     }
     cleanuplog(`pruneHistoryDir`, `(${grn}COMPLETE${rst})  Pruned ${HISTDIR} down to ${MAXHIST}`);
   }
@@ -188,14 +188,14 @@ wss.on(`connection`, function(ws) {
     if (isValidJSON(message)) {
       message = JSON.parse(message);
       if (Array.isArray(message)) {
-        jlog(`${bld}${ylw}NEW ${rst}${wht}Request${rst}`, `processImageArray`);
+        jlog(`${bld}${ylw}New ${rst}Request`, `processImageArray`);
         // Tell client we got good data and expected image count
         ws.send(JSON.stringify({request:`array`,result:`success`,size:message.length}));
 
         // async curl the images and zip them up server-side
         let tempdir = createTempDir();
         processImageArray(message, tempdir, ws).then( () => {
-          jlog(`processImageArray`, `(${grn}COMPLETE${rst})  Downloaded images saved to ${tempdir}`);
+          jlog(`processImageArray`, `(${grn}COMPLETE${rst})  Downloaded images saved to ${tempdir}/`);
           buildLatestZip(tempdir);
           // Tell client we finished & send the latest.zip
           ws.send(JSON.stringify({request:`array`,result:`success`,size:0}));
@@ -203,7 +203,7 @@ wss.on(`connection`, function(ws) {
           cleanupTempDir(tempdir); // We don't need to store the raw images anymore
         });
       } else if (message.request == `getlatest`) {
-        jlog(`${bld}${ylw}NEW ${rst}${wht}Request${rst}`, `sendLatestZip`);
+        jlog(`${bld}${ylw}New ${rst}Request`, `sendLatestZip`);
         sendLatestZip(ws);
       } else {
         mlog(`unhandledMessage`, `Unknown JSON request received: ${message}`);
