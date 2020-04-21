@@ -100,6 +100,41 @@ async function processImageArray(imagelist, tempdir, ws) {
   return Promise.all(promises);
 }
 
+async function processImageSkurls(skurls, tempdir, ws) {
+  jlog(`processImageSkurls`, `Attempting to download images...`);
+  let promises = [];
+  let count = 1;
+  for (let skurl of skurls) {
+    if (count % BATCHSIZE == 0) { await rateLimitTimeout(BATCHTIME); } // don't piss off imagehost
+    if (isValidImageURL(skurl.url)) {
+      let file_ext = getImageURLFileExtension(skurl.url);
+      let skuname = `${skurl.sku}${file_ext}`
+      let prom = syscall(`curl -s -o ${tempdir}/${skuname} ${skurl.url}`);
+      promises.push(prom.then(
+        success => {
+          jlog(`curlImagePromise`, `(${grn}done${rst})  ${skuname} - from URL: ${skurl.url}`);
+          let chunk = { request:`imagechunk`,result:`success`,file:img };
+          ws.send(JSON.stringify(chunk));
+        },
+        err => { elog(`curlImagePromise Rejection`, err); }
+      ).catch( e => { elog(`curlImagePromise Error`, e); }));
+    } else {
+      elog(`isValidImageURL`, `Failed to pass URL regex: ${skurl.url}`);
+    }
+    count++;
+  }
+  return Promise.all(promises);
+}
+
+function getImageURLFileExtension(url) {
+  let ext_regex = /\.([0-9a-z]+)(?=[?#])|(\.)(?:[\w]+)$/gmi;
+  let ext = ``;
+  if (url.match(ext_regex)) {
+    ext = url.match(ext_regex)[0];
+  }
+  return ext;
+}
+
 function buildLatestZip(image_dir) {
   if (fs.existsSync(LATESTZIP)) fs.unlinkSync(LATESTZIP);
   jlog(`buildLatestZip`, `Compressing contents of ${image_dir} to ${LATESTZIP}`);
@@ -187,7 +222,18 @@ wss.on(`connection`, function(ws) {
   ws.on(`message`, function(message) {
     if (isValidJSON(message)) {
       message = JSON.parse(message);
-      if (Array.isArray(message)) {
+      if (message.request == `processImageSkurls`) {
+        jlog(`${bld}${ylw}New ${rst}Request`, `processImageSkurls`);
+        let tempdir = createTempDir();
+        ws.send(JSON.stringify({request:`processImageSkurls`,result:`received`,size:message.length}));
+        processImageSkurls(message.data, tempdir, ws).then( () => {
+          jlog(`processImageSkurls`, `(${grn}COMPLETE${rst})  Downloaded images saved to ${tempdir}/`);
+          buildLatestZip(tempdir);
+          ws.send(JSON.stringify({request:`processImageSkurls`,result:`complete`,size:0}));
+          sendLatestZip(ws);
+          cleanupTempDir(tempdir); // We don't need to store the raw images anymore
+        });
+      } else if (Array.isArray(message)) {
         jlog(`${bld}${ylw}New ${rst}Request`, `processImageArray`);
         // Tell client we got good data and expected image count
         ws.send(JSON.stringify({request:`array`,result:`success`,size:message.length}));
