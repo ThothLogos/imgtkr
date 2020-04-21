@@ -149,22 +149,20 @@
         } else if (isValidJSON(msg.data)) {
           let res = JSON.parse(msg.data);
           if (res.request == `processSkurls` && res.result == `received`) {
-            if (res.size != 0) {
-              progress.imagecount  = res.size;
-              progress.remaining   = res.size;
-              progress.currentprog = 0;
-              lblStatus.textContent = `Server received ${progress.imagecount} image URLs. Processing...`;
-              lblRequested.textContent = `${progress.imagecount}`;
-              dlog(`  (SERVER) Processing ${progress.imagecount} image URLs.`);
-              updateProgress(progress);
-            } else {
-              dlog(`  (SERVER) Done processing images. Sending zip.`);
-              lblStatus.textContent = `Waiting on zip from server...`;
-              progress.remaining  = 0;
-              progress.currentprog = 100;
-              lblRemaining.textContent = `0`;
-              updateProgress(progress);
-            }
+            progress.imagecount  = res.size;
+            progress.remaining   = res.size;
+            progress.currentprog = 0;
+            lblStatus.textContent = `Server received ${progress.imagecount} image URLs. Processing...`;
+            lblRequested.textContent = `${progress.imagecount}`;
+            dlog(`  (SERVER) Processing ${progress.imagecount} image URLs.`);
+            updateProgress(progress);
+          } else if (res.request == `processSkurls` && res.result == `complete`) {
+            dlog(`  (SERVER) Done processing images. Sending zip.`);
+            lblStatus.textContent = `Waiting on zip from server...`;
+            progress.remaining  = 0;
+            progress.currentprog = 100;
+            lblRemaining.textContent = `0`;
+            updateProgress(progress);
           } else if (res.request == `imagechunk` && res.result == `success`) {
             progress.remaining   -= 1;
             progress.currentprog += 100 / progress.imagecount;
