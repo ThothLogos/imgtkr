@@ -43,21 +43,28 @@ Client request, sending image list:
   
 ```javascript
 
+// Each image URL comes in an object containing its product sku
 let url1 = { sku : "SKU0000009", url : "https://img.example.com/images/somepic0001.jpg" };
 let url2 = { sku : "SKU0011119", url : "https://img.example.com/images/somepic0001.jpg" };
 // and so on
 
+// Push each URL/SKU object above into an Array
 let image_arr = [url1, url2, ... ];
-let request = { request : "processImageList", data: image_arr };
 
-WebSocket.send(JSON.stringify(image_arr));
+// Wrap that array in an object that includes a "request" property, informing the server of the request
+let request = { request : "processImageList", data : image_arr };
+
+// JSON.stringify() the above, and fire it off
+WebSocket.send(JSON.stringify(request));
 
 ```
 Client request, getting the existing latest.zip:
 
 ```javascript
+// Tell the server what we want done
+let request = { request : "getLatestZip" };
 
-let request = { request : "getlatest" };
+// Always be JSONing.
 WebSocket.send(JSON.stringify(request));
 
 ```
@@ -65,24 +72,27 @@ WebSocket.send(JSON.stringify(request));
 Server responses:
   
 ```javascript
+// The server will affirm receipt of requests to the client
+// We can trigger status updates on the UI with this ie "Server received image list."
 {
-  request : "processimagelist",
-  result  : "success",
+  request : "processImageList",
+  result  : "received",
   message : "none"
 }
 
-}
-  request : "getlatest",
-  result  : "success",
-  message : "none"
-}
-```
-Server in-progress updates:
-
-```javascript
+// Server informs the client of every successful image completion
+// Can be used for GUI progress bars, logging, etc.
 {
   request : 'imagechunk',
   result  : 'success',
   file    : '064508.jpg'
+}
+
+
+// Status update: "Server is re-sending most recent zip..."
+}
+  request : "getLatestZip",
+  result  : "received",
+  message : "none"
 }
 ```
