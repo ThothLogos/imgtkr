@@ -75,32 +75,6 @@ function createTempDir() {
   return `${DATADIR}/${now}`;
 }
 
-/* -------- THE OLD WAY -------
-async function processImageArray(imagelist, tempdir, ws) {
-  jlog(`processImageArray`, `Attempting to download images...`);
-  let promises = [];
-  let count = 1;
-  for (let image_url of imagelist) {
-    if (count % BATCHSIZE == 0) { await rateLimitTimeout(BATCHTIME); } // don't piss off imagehost
-    if (isValidImageURL(image_url)) {
-      let img = image_url.toString().split(`/`).pop();
-      let prom = syscall(`curl -s -o ${tempdir}/${img} ${image_url}`);
-      promises.push(prom.then(
-        success => { 
-          jlog(`curlImagePromise`, `(${grn}done${rst})  ${img} - from URL: ${image_url}`);
-          let chunk = { request:`imagechunk`,result:`success`,file:img };
-          ws.send(JSON.stringify(chunk));
-        },
-        err => { elog(`curlImagePromise Rejection`, err); }
-      ).catch( e => { elog(`curlImagePromise Error`, e); }));
-    } else {
-      elog(`isValidImageURL`, `Failed to pass URL regex: ${image_url}`);
-    }
-    count++;
-  }
-  return Promise.all(promises);
-} */
-
 async function processSkurls(skurls, tempdir, ws) {
   jlog(`processSkurls`, `Attempting to download images...`);
   let promises = [];
@@ -226,7 +200,7 @@ wss.on(`connection`, function(ws) {
       if (message.request == `processSkurls`) {
         jlog(`${bld}${ylw}New ${rst}Request`, `processSkurls`);
         let tempdir = createTempDir();
-        ws.send(JSON.stringify({request:`processSkurls`,result:`received`,size:message.length}));
+        ws.send(JSON.stringify({request:`processSkurls`,result:`received`,size:message.data.length}));
         processSkurls(message.data, tempdir, ws).then( () => {
           jlog(`processSkurls`, `(${grn}COMPLETE${rst})  Downloaded images saved to ${tempdir}/`);
           buildLatestZip(tempdir);
@@ -234,22 +208,6 @@ wss.on(`connection`, function(ws) {
           sendLatestZip(ws);
           cleanupTempDir(tempdir); // We don't need to store the raw images anymore
         });
-      /* --- THE OLD WAY -------
-      } else if (Array.isArray(message)) {
-        jlog(`${bld}${ylw}New ${rst}Request`, `processImageArray`);
-        // Tell client we got good data and expected image count
-        ws.send(JSON.stringify({request:`array`,result:`success`,size:message.length}));
-
-        // async curl the images and zip them up server-side
-        let tempdir = createTempDir();
-        processImageArray(message, tempdir, ws).then( () => {
-          jlog(`processImageArray`, `(${grn}COMPLETE${rst})  Downloaded images saved to ${tempdir}/`);
-          buildLatestZip(tempdir);
-          // Tell client we finished & send the latest.zip
-          ws.send(JSON.stringify({request:`array`,result:`success`,size:0}));
-          sendLatestZip(ws);
-          cleanupTempDir(tempdir); // We don't need to store the raw images anymore
-        }); */
       } else if (message.request == `getLatestZip`) {
         jlog(`${bld}${ylw}New ${rst}Request`, `sendLatestZip ${message}`);
         sendLatestZip(ws);

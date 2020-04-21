@@ -94,10 +94,6 @@
       function doGetZip() {
         disableButtons();
         dlog(`Sending image array to server.`);
-
-        // Commented out this is the Array.isArray() old method
-        //sendImageArray(generateImageArray());
-
         let list = genImageListRequest();
         dlog(`Raw list ${list}`);
         let json = JSON.stringify(list);
