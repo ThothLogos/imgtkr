@@ -6,19 +6,20 @@
 
 - Nginx confs modified to set up proxy_pass to websocket server on port `8011`.
 
-- `server.js` listens on `nodews` container at `8011`, any messages passed to the server are checked to see if `Array.isArray(message)` passes - if so, it is treated as an array of Image URLs to go fetch. Otherwise, it treats the message as a string and simply echos it to console and back to the client.
+- `server.js` listens on `nodews` container at `8011`, any messages passed to the server are checked to see if `Array.isArray(message)` passes - if so, it is treated as an array of Image URLs to go fetch. Otherwise, it attempts to parse JSON for other requests, like a message or re-download request.
 
-- Current getImages() process: 
+- Current process for handling the image Array:
 
-  - create a `tempdir` named with a unix-timestamp of Date.now()
-  - iterate over the URL array, do synchronous syscall to `curl` for each item, write to `tempdir`
+  - create a temporary directory named with a unix-timestamp
+  - do asynchronous calls to `curl` for each image, using a `setTimeout` promise to rate-limit
   - synchronous syscall to `zip` to package all image files into a zip, placed in `/cover-data` (shared volume)
-  - do syncrhonous `fs.readFileSync()` on the finished zip, prep binary data for transfer
+  - do `fs.readFileSync()` on the finished zip, prep binary data for transfer
   - set `ws.binaryType = 'blob'`, perform `websocket.send()` to push zipfile to client
   - auto-cleanup relies on `MAXHIST` to determine how many previous zips to keep, runs when new zips are made and server start
   
 - __Server TODOs:__
 
+  - Cleanup on startup for potential tempdir orphans
   - Allow client to request a specific historic zip by name
   - Need to trap server's failure and do cleanup/graceful shutdown.
   - Can we simplify the shared volume situation? Does nginx even need modification now?
@@ -42,8 +43,7 @@ Client request, sending image list:
   
 ```javascript
 {
-  request : "processimagelist",
-  message : "none"
+  [url1, url2, ... ]
 }
 ```
 Requesting latest.zip:
@@ -68,5 +68,14 @@ Server responses:
   request : "getlatest"
   result  : "success",
   message : "none"
+}
+```
+Server in-progress updates:
+
+```javascript
+{
+  request : 'imagechunk',
+  result  : 'success',
+  file    : '064508.jpg'
 }
 ```
