@@ -75,6 +75,7 @@ function createTempDir() {
   return `${DATADIR}/${now}`;
 }
 
+/* -------- THE OLD WAY -------
 async function processImageArray(imagelist, tempdir, ws) {
   jlog(`processImageArray`, `Attempting to download images...`);
   let promises = [];
@@ -98,10 +99,10 @@ async function processImageArray(imagelist, tempdir, ws) {
     count++;
   }
   return Promise.all(promises);
-}
+} */
 
-async function processImageSkurls(skurls, tempdir, ws) {
-  jlog(`processImageSkurls`, `Attempting to download images...`);
+async function processSkurls(skurls, tempdir, ws) {
+  jlog(`processSkurls`, `Attempting to download images...`);
   let promises = [];
   let count = 1;
   for (let skurl of skurls) {
@@ -113,7 +114,7 @@ async function processImageSkurls(skurls, tempdir, ws) {
       promises.push(prom.then(
         success => {
           jlog(`curlImagePromise`, `(${grn}done${rst})  ${skuname} - from URL: ${skurl.url}`);
-          let chunk = { request:`imagechunk`,result:`success`,file:img };
+          let chunk = { request:`imagechunk`,result:`success`,file:skuname };
           ws.send(JSON.stringify(chunk));
         },
         err => { elog(`curlImagePromise Rejection`, err); }
@@ -222,17 +223,18 @@ wss.on(`connection`, function(ws) {
   ws.on(`message`, function(message) {
     if (isValidJSON(message)) {
       message = JSON.parse(message);
-      if (message.request == `processImageSkurls`) {
-        jlog(`${bld}${ylw}New ${rst}Request`, `processImageSkurls`);
+      if (message.request == `processSkurls`) {
+        jlog(`${bld}${ylw}New ${rst}Request`, `processSkurls`);
         let tempdir = createTempDir();
-        ws.send(JSON.stringify({request:`processImageSkurls`,result:`received`,size:message.length}));
-        processImageSkurls(message.data, tempdir, ws).then( () => {
-          jlog(`processImageSkurls`, `(${grn}COMPLETE${rst})  Downloaded images saved to ${tempdir}/`);
+        ws.send(JSON.stringify({request:`processSkurls`,result:`received`,size:message.length}));
+        processSkurls(message.data, tempdir, ws).then( () => {
+          jlog(`processSkurls`, `(${grn}COMPLETE${rst})  Downloaded images saved to ${tempdir}/`);
           buildLatestZip(tempdir);
-          ws.send(JSON.stringify({request:`processImageSkurls`,result:`complete`,size:0}));
+          ws.send(JSON.stringify({request:`processSkurls`,result:`complete`,size:0}));
           sendLatestZip(ws);
           cleanupTempDir(tempdir); // We don't need to store the raw images anymore
         });
+      /* --- THE OLD WAY -------
       } else if (Array.isArray(message)) {
         jlog(`${bld}${ylw}New ${rst}Request`, `processImageArray`);
         // Tell client we got good data and expected image count
@@ -247,9 +249,9 @@ wss.on(`connection`, function(ws) {
           ws.send(JSON.stringify({request:`array`,result:`success`,size:0}));
           sendLatestZip(ws);
           cleanupTempDir(tempdir); // We don't need to store the raw images anymore
-        });
-      } else if (message.request == `getlatest`) {
-        jlog(`${bld}${ylw}New ${rst}Request`, `sendLatestZip`);
+        }); */
+      } else if (message.request == `getLatestZip`) {
+        jlog(`${bld}${ylw}New ${rst}Request`, `sendLatestZip ${message}`);
         sendLatestZip(ws);
       } else {
         mlog(`unhandledMessage`, `Unknown JSON request received: ${message}`);
