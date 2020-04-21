@@ -85,26 +85,7 @@ function createTempImageDir() {
   return `${DATADIR}/${now}`;
 }
 
-function processImageArray(imagelist, tempdir, ws) {
-  let chunks = imagelist.length;
-  jlog(`processImageArray`, `Attempting to download images...`);
-  imagelist.forEach( image_url => {
-    jlog(`processImageArray`, image_url);
-    if (isValidImageURL(image_url)) {
-      let img = image_url.toString().split(`/`).pop();
-      if (curlImageURL(image_url, tempdir, img)) {
-        jlog(`processImageArray`, `${img} complete.`);
-        let chunk = { request:`imagechunk`,result:`success`,file:img };
-        ws.send(JSON.stringify(chunk));
-      }
-    } else {
-      elog(`isValidImageURL`, `Failed to pass URL regex: ${image_url}`);
-    }
-  });
-  jlog(`processImageArray`, `${xgrn}Complete${xrst} - Downloaded images saved to ${tempdir}`);
-}
-
-async function processImageArrayASYNCPlus(imagelist, tempdir, ws) {
+async function processImageArray(imagelist, tempdir, ws) {
   jlog(`processImageArray`, `Attempting to download images...`);
   let promises = [];
   let count = 1;
@@ -227,7 +208,7 @@ wss.on(`connection`, function(ws) {
 
         // curl the images and zip them up server-side (synchronous but atomic syscalls)
         let tempdir = createTempImageDir();
-        processImageArrayASYNCPlus(message, tempdir, ws).then( () => {
+        processImageArray(message, tempdir, ws).then( () => {
           jlog(`processImageArray`, `${xgrn}Complete${xrst} - Downloaded images saved to ${tempdir}`);
           buildLatestZip(tempdir);
           // Tell client we finished & send the latest.zip
