@@ -75,10 +75,11 @@ Server responses:
 ```javascript
 // The server will affirm receipt of requests to the client
 // We can trigger status updates on the UI with this ie "Server received image list."
+// Size can be used to track progress/remaining etc
 {
   request : "processSkurls",
   result  : "received",
-  message : "none"
+  size    : Serverside.skurls.length
 }
 
 // Server informs the client of every successful image completion
@@ -89,8 +90,17 @@ Server responses:
   file    : '064508.jpg'
 }
 
+// Server sends a final notice that the Skurls request has finished server-side
+// After this the server compiles and pushes latest.zip to client
+// Again this can be used to trigger UI status updates, progress tracking etc
+{
+  request : "processSkurls",
+  result  : "complete",
+  size    : 0
+}
 
-// Status update: "Server is re-sending most recent zip..."
+// Server confirms receipt of a getLatestZip request
+// UI status update: "Server is re-sending most recent zip..."
 }
   request : "getLatestZip",
   result  : "received",
