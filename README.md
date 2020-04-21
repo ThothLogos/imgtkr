@@ -18,13 +18,14 @@ let skurl = { sku : "SKU123098", url : "https://img.example.com/images/somepic00
 
   - create a temporary directory named with a unix-timestamp
   - do asynchronous calls to `curl` for each image, using a `setTimeout` promise to rate-limit
-  - use regex capture on each `url` to get the `file_ext` ie jpg, png, etc
-  - use the `skurl.sku` property with the `file_ext` to rename files to `${skurl.sku}.${file_ext}`. This happens during the `curl` call, `curl` writes the files using the new constructed name.
-  - only after all `curl` calls return, perform synchronous syscall to `zip` to package all image files into a zip, placed in `/cover-data` (which currently is a docker shared volume, this may be a deprecated dependency)
+  - use regex capture on each `skurl.url` to get the `file_ext` ie jpg, png, etc
+  - use the `skurl.sku` property with the `file_ext` to rename files to `${skurl.sku}.${file_ext}`. This happens as part of the `curl` command's parameters.
+  - after all `curl` calls return, perform synchronous syscall to `zip` to package all SKUnamed images, placing the resultant file at `/cover-data/latest.zip`
   - do `fs.readFileSync()` on the finished zip, prep binary data for transfer
   - set `ws.binaryType = 'blob'`
   - perform `websocket.send()` to push zipfile to client
-  - perform auto-cleanup using `const MAXHIST` to determine how many historical zips to keep. This runs when any new zips are made and during server startup.
+  - `cp` the fresh `latest.zip` to `/cover-data/previous_zips/` and rename with datetime, ie `2020-04-21_191039.zip`
+  - perform auto-cleanup using `const MAXHIST` to determine how many historical zips to keep. This runs when any new zips are made and during server startup, prevent container filesystem bloat. Historical zips are kept in-case of oh-shit need, and for a future potential feature to allow the user to access previous archives for re-download.
   
 - __Server TODOs:__
 
