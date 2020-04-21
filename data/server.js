@@ -150,7 +150,7 @@ function archiveLatestZip(zipfile) {
 function sendLatestZip(ws) {
   let pack = getImageArchive(LATESTZIP);
   ws.binaryType = `blob`; // Actually nodebuffer
-  jlog(`sendLatestZip`, `Sending ${LATESTZIP} to client.`);
+  jlog(`sendLatestZip`, `(${cyn}TRANSMIT${rst})  Sending ${LATESTZIP} to client.`);
   ws.send(pack);
 }
 
@@ -188,7 +188,7 @@ function cleanupTempDir(tempdir) {
   } catch (e) { elog(`cleanupTempDir`, e); }
 }
 
-statuslog(`${bld}${wht}STARTUP${rst}`, `Starting Node WebSocket server on 8011...`);
+statuslog(`\t${bld}${wht}STARTUP${rst}`, `\tStarting Node WebSocket server on 8011...`);
 var WebSocketServer = require(`ws`).Server;
 wss = new WebSocketServer({port: 8011});
 initHistoryDir();
@@ -198,7 +198,7 @@ wss.on(`connection`, function(ws) {
     if (isValidJSON(message)) {
       message = JSON.parse(message);
       if (message.request == `processSkurls`) {
-        jlog(`${bld}${ylw}New ${rst}Request`, `processSkurls`);
+        jlog(`${ylw}NEW${rst} Request`, `(${ylw}REQUEST${rst}) processSkurls -> calls processSkurls()`);
         let tempdir = createTempDir();
         ws.send(JSON.stringify({request:`processSkurls`,result:`received`,size:message.data.length}));
         processSkurls(message.data, tempdir, ws).then( () => {
@@ -209,7 +209,7 @@ wss.on(`connection`, function(ws) {
           cleanupTempDir(tempdir); // We don't need to store the raw images anymore
         });
       } else if (message.request == `getLatestZip`) {
-        jlog(`${bld}${ylw}New ${rst}Request`, `sendLatestZip ${message}`);
+        jlog(`${ylw}NEW${rst} Request`, `(${ylw}REQUEST${rst}) getLatestZip -> calls sendLatestZip()`);
         sendLatestZip(ws);
       } else {
         mlog(`unhandledMessage`, `Unknown JSON request received: ${message}`);
