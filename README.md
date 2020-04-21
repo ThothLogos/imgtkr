@@ -42,17 +42,24 @@
 Client request, sending image list:
   
 ```javascript
-{
-  [url1, url2, ... ]
-}
+
+let url1 = { sku : "SKU0000009", url : "https://img.example.com/images/somepic0001.jpg" };
+let url2 = { sku : "SKU0011119", url : "https://img.example.com/images/somepic0001.jpg" };
+// and so on
+
+let image_arr = [url1, url2, ... ];
+let request = { request : "processImageList", data: image_arr };
+
+WebSocket.send(JSON.stringify(image_arr));
+
 ```
-Requesting latest.zip:
+Client request, getting the existing latest.zip:
 
 ```javascript
-}
-  request : "getlatest"
-  message : "none"
-}
+
+let request = { request : "getlatest" };
+WebSocket.send(JSON.stringify(request));
+
 ```
 
 Server responses:
@@ -65,7 +72,7 @@ Server responses:
 }
 
 }
-  request : "getlatest"
+  request : "getlatest",
   result  : "success",
   message : "none"
 }
