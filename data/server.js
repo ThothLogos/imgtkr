@@ -1,4 +1,6 @@
-const fs = require(`fs`);
+const fs          = require(`fs`);
+const util        = require('util');
+const syscall     = util.promisify(require(`child_process`).exec);
 const syscallSync = require(`child_process`).execSync;
 
 const DATADIR   = `/cover-data`;
@@ -92,6 +94,26 @@ function processImageArray(imagelist, tempdir, ws) {
     }
   });
   jlog(`processImageArray`, `${xgrn}Complete${xrst} - Downloaded images saved ${tempdir}`);
+}
+
+async function processImageArrayASYNC(imagelist, tempdir, ws) {
+  let chunks = imagelist.length;
+  jlog(`processImageArray`, `Attempting to download images...`);
+  let promises = [];
+  imagelist.forEach( image_url => {
+    jlog(`processImageArray`, image_url);
+    if (isValidImageURL(image_url)) {
+      let img = image_url.toString().split(`/`).pop();
+      let prom = syscall(`curl -s -o ${tempdir}/${img} ${image_url}`);
+      promises.push(prom.then(
+        success => { jlog(`curlImagePromise`, `Image ${img} finished`); },
+        err => { elog(`curlImagePromise Rejection`, err); }
+      ));
+    } else {
+      elog(`isValidImageURL`, `Failed to pass URL regex: ${image_url}`);
+    }
+  });
+  return Promise.all(promises);
 }
 
 function buildLatestZip(image_dir) {
@@ -188,13 +210,14 @@ wss.on(`connection`, function(ws) {
 
         // curl the images and zip them up server-side (synchronous but atomic syscalls)
         let tempdir = createTempImageDir();
-        processImageArray(message, tempdir, ws);
-        buildLatestZip(tempdir);
-
-        // Tell client we finished & send the latest.zip
-        ws.send(JSON.stringify({request:`array`,result:`success`,size:0}));
-        sendLatestZip(ws);
-        removeTempImageDir(tempdir); // We don't need to store the raw images anymore
+        processImageArrayASYNC(message, tempdir, ws).then( () => {
+          jlog(`processImageArray`, `${xgrn}Complete${xrst} - Downloaded images saved ${tempdir}`);
+          buildLatestZip(tempdir);
+          // Tell client we finished & send the latest.zip
+          ws.send(JSON.stringify({request:`array`,result:`success`,size:0}));
+          sendLatestZip(ws);
+          removeTempImageDir(tempdir); // We don't need to store the raw images anymore
+        });
       } else if (message.request == `getlatest`) {
         jlog(`${xbld}${xylw}NEW ${xrst}${xwht}Request${xrst}`, `sendLatestZip`);
         sendLatestZip(ws);
