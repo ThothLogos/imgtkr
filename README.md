@@ -53,7 +53,7 @@ let skurl2 = { sku : "SKU0011119", url : "https://img.example.com/images/somepic
 let skurls_arr = [ skurl1, skurl2, ... ];
 
 // Wrap that array in an object that includes a "request" property, informing the server of the request
-let request = { request : "processImageList", data : skurls_arr };
+let request = { request : "processSkurls", data : skurls_arr };
 
 // JSON.stringify() the above, and fire it off
 WebSocket.send(JSON.stringify(request));
@@ -76,7 +76,7 @@ Server responses:
 // The server will affirm receipt of requests to the client
 // We can trigger status updates on the UI with this ie "Server received image list."
 {
-  request : "processImageList",
+  request : "processSkurls",
   result  : "received",
   message : "none"
 }
