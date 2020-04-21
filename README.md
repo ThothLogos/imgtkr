@@ -43,16 +43,17 @@ Client request, sending image list:
   
 ```javascript
 
-// Each image URL comes in an object containing its product sku
-let url1 = { sku : "SKU0000009", url : "https://img.example.com/images/somepic0001.jpg" };
-let url2 = { sku : "SKU0011119", url : "https://img.example.com/images/somepic0001.jpg" };
+// Each image URL comes in an object containing its product SKU
+// I dub thee, a 'skurl'
+let skurl1 = { sku : "SKU0000009", url : "https://img.example.com/images/somepic0001.jpg" };
+let skurl2 = { sku : "SKU0011119", url : "https://img.example.com/images/somepic0001.jpg" };
 // and so on
 
-// Push each URL/SKU object above into an Array
-let image_arr = [url1, url2, ... ];
+// Push each SKU/URL object above into an Array
+let skurls_arr = [ skurl1, skurl2, ... ];
 
 // Wrap that array in an object that includes a "request" property, informing the server of the request
-let request = { request : "processImageList", data : image_arr };
+let request = { request : "processImageList", data : skurls_arr };
 
 // JSON.stringify() the above, and fire it off
 WebSocket.send(JSON.stringify(request));
