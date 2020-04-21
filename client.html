@@ -66,11 +66,11 @@
         let last4 = randomIntFromInterval(5000,9999);
         for(let i = 105; i > 0; i--) {
           let urlref = `${url_root}/STL06${last4}.jpg`;
-          let skuname = `SKU${randomIntFromInterval(100000000, 99999999)}`;
+          let skuname = `SKU${randomIntFromInterval(1000000, 9999900)}`;
           last4 -= 1;
           skurls.push( { sku: skuname, url: urlref } );
         }
-        return { request : "processImageList", data: skurls };
+        return { request : "processSkurls", data: skurls };
       }
 
       // Generate some psuedo-random image sets so we get diff zips on retries
@@ -98,7 +98,11 @@
         // Commented out this is the Array.isArray() old method
         //sendImageArray(generateImageArray());
 
-        try { websock.send(JSON.stringify(genImageListRequest()));
+        let list = genImageListRequest();
+        dlog(`Raw list ${list}`);
+        let json = JSON.stringify(list);
+        dlog(`\n\n${json}\n\n`);
+        try { websock.send(json);
         } catch (e) { dlog(`ERROR genImageListRequest send failed! ${e}`); }
       }
 
@@ -106,7 +110,7 @@
         disableButtons();
         dlog(`Requesting previous latest.zip from server.`);
         lblStatus.textContent = `Waiting on zip from server...`;
-        try { websock.send(JSON.stringify({request:`getlatest`})); }
+        try { websock.send(JSON.stringify({request:`getLatestZip`})); }
         catch (e) { dlog(`ERROR doGetLatest: ${e}`); }
       }
 
@@ -148,7 +152,7 @@
           enableButtons();
         } else if (isValidJSON(msg.data)) {
           let res = JSON.parse(msg.data);
-          if (res.request == `array` && res.result == `success`) {
+          if (res.request == `processSkurls` && res.result == `received`) {
             if (res.size != 0) {
               progress.imagecount  = res.size;
               progress.remaining   = res.size;
