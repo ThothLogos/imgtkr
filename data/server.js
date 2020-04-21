@@ -7,6 +7,8 @@ const DATADIR   = `/cover-data`;
 const HISTDIR   = `${DATADIR}/previous_zips`;
 const LATESTZIP = `${DATADIR}/latest.zip`;
 const MAXHIST   = 12;
+const BATCHSIZE = 12;
+const BATCHTIME = 600;
 
 const xrst = `\x1b[0m`;
 const xbld = `\x1b[1m`;
@@ -45,6 +47,12 @@ function isValidJSON(str) {
 
 function isValidImageURL(image_url) {
   return /^(?:\w+:)?\/\/([^\s\.]+\.\S{2}|localhost[\:?\d]*)\S*$/.test(image_url);
+}
+
+async function rateLimit() {
+  return new Promise( resolve => {
+    setTimeout( () => { resolve('resolved!'); }, BATCHTIME);
+  });
 }
 
 function getImageArchive(path) {
@@ -93,26 +101,35 @@ function processImageArray(imagelist, tempdir, ws) {
       elog(`isValidImageURL`, `Failed to pass URL regex: ${image_url}`);
     }
   });
-  jlog(`processImageArray`, `${xgrn}Complete${xrst} - Downloaded images saved ${tempdir}`);
+  jlog(`processImageArray`, `${xgrn}Complete${xrst} - Downloaded images saved to ${tempdir}`);
 }
 
-async function processImageArrayASYNC(imagelist, tempdir, ws) {
-  let chunks = imagelist.length;
+async function processImageArrayASYNCPlus(imagelist, tempdir, ws) {
   jlog(`processImageArray`, `Attempting to download images...`);
   let promises = [];
-  imagelist.forEach( image_url => {
+  let count = 1;
+  for (let image_url of imagelist) {
+    if (count % BATCHSIZE == 0) {
+      statuslog(`rateLimit`,`${xylw}Limit${xrst} - ${BATCHSIZE} requests per ${BATCHTIME} ms.`);
+      await rateLimit(BATCHTIME);
+    }
     jlog(`processImageArray`, image_url);
     if (isValidImageURL(image_url)) {
       let img = image_url.toString().split(`/`).pop();
       let prom = syscall(`curl -s -o ${tempdir}/${img} ${image_url}`);
       promises.push(prom.then(
-        success => { jlog(`curlImagePromise`, `Image ${img} finished`); },
+        success => { 
+          jlog(`curlImagePromise`, `Image ${img} finished`);
+          let chunk = { request:`imagechunk`,result:`success`,file:img };
+          ws.send(JSON.stringify(chunk));
+        },
         err => { elog(`curlImagePromise Rejection`, err); }
-      ));
+      ).catch( e => { elog(`curlImagePromise Error`, e); }));
     } else {
       elog(`isValidImageURL`, `Failed to pass URL regex: ${image_url}`);
     }
-  });
+    count++;
+  }
   return Promise.all(promises);
 }
 
@@ -210,8 +227,8 @@ wss.on(`connection`, function(ws) {
 
         // curl the images and zip them up server-side (synchronous but atomic syscalls)
         let tempdir = createTempImageDir();
-        processImageArrayASYNC(message, tempdir, ws).then( () => {
-          jlog(`processImageArray`, `${xgrn}Complete${xrst} - Downloaded images saved ${tempdir}`);
+        processImageArrayASYNCPlus(message, tempdir, ws).then( () => {
+          jlog(`processImageArray`, `${xgrn}Complete${xrst} - Downloaded images saved to ${tempdir}`);
           buildLatestZip(tempdir);
           // Tell client we finished & send the latest.zip
           ws.send(JSON.stringify({request:`array`,result:`success`,size:0}));
