@@ -1,4 +1,17 @@
-# Current Implementation
+## Installation... maybe?
+
+- The `data` folder will need `data/server.js`, `/data/nginx.conf`, and `data/nginx/app.conf` from this repo. It may also need `data/package.json` but honestly I have no idea if those warnings matter.
+- The `Dockerfile` in this repo controls customizations to the default `node-alpine` image. It will need to be present.
+- The `docker-compose.yml` is updated.
+- I think that's it, after that you need to build the `nodews` image:
+  - `docker build -f [DOCKERFILE] -t [IMAGE_NAME] [BUILD_CONTEXT_PATH]`, where `IMAGE_NAME` format is typically: `[REPO/AUTHOR]/[IMAGENAME]:[VERSION]`. Examples: `thothlogos/nodews:0.1` or `gutterpop/imgtkr:1.0` etc.
+  - The command might be `docker build -f ./Dockerfile -t thothlogos/nodews:0.1 .` __Note the dot at the end!__ The last argument is the "build context", so in this example I would be running it from the project root, the same place the `docker-compose.yml` exists right now.
+  - This image should be built and ready to go, __IF__ you changed the `IMAGE_NAME` stuff above, you will need to update the `docker-compose.yml` to use the new naming.
+- Once the image is built, I believe running `docker-compose up` should `doAllTheThings()` from there.
+- The `rebuild.sh` script is a dev tool for me to quickly tear down all containers, nuke the `nodews` image, rebuild it fresh, and re-compose the cluster. It should be an irrelevant process to a production environment but may be handy when testing.
+
+# Current Implementation Details
+
 
 ### Server-side
 
