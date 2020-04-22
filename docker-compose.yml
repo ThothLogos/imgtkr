@@ -41,7 +41,9 @@ services:
 
 
   nodews:
-    image: thothlogos/nodews:0.1
+    build:
+      context: .
+      dockerfile: Dockerfile
     user: "node"
     restart: unless-stopped
     expose:
