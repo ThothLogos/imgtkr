@@ -45,7 +45,7 @@ WebSocketServer.on(`connection`, function(socket) {
           buildLatestZip(tempdir);
           socket.send(JSON.stringify({request:`processSkurls`,result:`complete`,size:0}));
           sendLatestZip(socket);
-          //cleanupTempDir(tempdir); // We don't need to store the raw images anymore
+          cleanupTempDir(tempdir); // We don't need to store the raw images anymore
         });
       } else if (message.request == `getLatestZip`) {
         jlog(`${ylw}NEW${rst} Request`, `(${ylw}REQUEST${rst}) getLatestZip -> call sendLatestZip()`);
