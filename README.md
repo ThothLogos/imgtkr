@@ -9,6 +9,7 @@
   - This image should be built and ready to go, __IF__ you changed the `IMAGE_NAME` stuff above, you will need to update the `docker-compose.yml` to use the new naming.
 - Once the image is built, I believe running `docker-compose up` should `doAllTheThings()` from there.
 - The `rebuild.sh` script is a dev tool for me to quickly tear down all containers, nuke the `nodews` image, rebuild it fresh, and re-compose the cluster. It should be an irrelevant process to a production environment but may be handy when testing.
+- The `client.html` file is also a dev/testing tool, but may serve as a reference for implementing a WebSocket client in the Vue app.
 
 # Current Implementation Details
 
