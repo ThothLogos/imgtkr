@@ -1,7 +1,7 @@
 version: '3.7'
 services:
   nginx:
-    image: thothlogos/alpinexws-0.1:latest
+    image: thothlogos/alpinexws:0.1
     restart: unless-stopped
     volumes:
       - ./data/nginx:/etc/nginx/conf.d
