@@ -20,12 +20,12 @@ const mag = `\x1b[35m`;
 const cyn = `\x1b[36m`;
 const wht = `\x1b[37m`;
 
-// Color Logging - Error, Warn, Job, Message, Cleanup, Setup
+// Color Logging - Error, Warn, Job, Message, Cleanup, Status
 function elog(src, err) { console.log(`[ ${red}${bld}!${rst} ${red}ERR${rst} ] ${src}\t\t${err}`);}
 function wlog(src, wrn) { console.log(`[ ${ylw}${bld}!${rst} ${ylw}WRN${rst} ] ${src}\t\t${wrn}`); }
 function jlog(src, msg) { console.log(`[ ${mag} JOB ${rst} ] ${src}\t\t${msg}`); }
 function mlog(src, msg) { console.log(`[${cyn}MESSAGE${rst}] ${src}\t\t${msg}`); }
-function cleanuplog(src, msg) { console.log(`[ ${ylw}CLEAN${rst} ] ${src}\t\t${msg}`); }
+function cleanuplog(src, msg) { console.log(`[${ylw}CLEANUP${rst}] ${src}\t\t${msg}`); }
 function statuslog(src, msg) { console.log(`[ ${blu}STATE${rst} ] ${src}\t\t${msg}`); }
 
 function getDateName() {

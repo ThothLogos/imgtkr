@@ -113,7 +113,6 @@ Server responses:
 // UI status update: "Server is re-sending most recent zip..."
 }
   request : "getLatestZip",
-  result  : "received",
-  message : "none"
+  result  : "received"
 }
 ```
