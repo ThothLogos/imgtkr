@@ -40,8 +40,7 @@ function getDateName() {
 }
 
 function isValidJSON(str) {
-  try { JSON.parse(str); }
-  catch (e) { return false; }
+  try { JSON.parse(str); } catch (e) { return false; }
   return true;
 }
 
@@ -50,23 +49,12 @@ function isValidImageURL(image_url) {
 }
 
 async function rateLimitTimeout() {
-  statuslog(`rateLimitTimeout`,`(${ylw}LIMIT${rst}) Set to ${BATCHSIZE} per ${BATCHTIME} ms`);
-  return new Promise( resolve => {
-    setTimeout( () => { resolve('resolved!'); }, BATCHTIME);
-  });
-}
-
-function getImageArchive(path) {
-  if (fs.existsSync(path)) {
-    jlog(`getImageArchive`, `Found archive at ${path}, attempting read...`);
-    return fs.readFileSync(path);
-  } else {
-    elog(`getImageArchive`, `Failed to locate .zip archive at ${path}`);
-  }
+  statuslog(`rateLimitTimeout`, `(${ylw}LIMIT${rst}) Set to ${BATCHSIZE} per ${BATCHTIME} ms`);
+  return new Promise( resolve => { setTimeout( () => { resolve('resolved!'); }, BATCHTIME); });
 }
 
 function createTempDir() {
-  let now = Date.now();
+  let now = Date.now(); // Returns unix-time seconds as our unique name for the tempdir
   if (!fs.existsSync(`${DATADIR}/${now}`)){
     try { fs.mkdirSync(`${DATADIR}/${now}`); }
     catch (e) { elog(`createTempDir`, e); }
@@ -77,20 +65,19 @@ function createTempDir() {
 
 async function processSkurls(skurls, tempdir, ws) {
   jlog(`processSkurls`, `Attempting to download images...`);
-  let promises = [];
+  let curl_promises = [];
   let count = 1;
   for (let skurl of skurls) {
-    if (count % BATCHSIZE == 0) { await rateLimitTimeout(BATCHTIME); } // don't piss off imagehost
+    if (count % BATCHSIZE == 0) { await rateLimitTimeout(BATCHTIME); } // don't piss off imagehosts
     if (isValidImageURL(skurl.url)) {
-      let file_ext = getImageURLFileExtension(skurl.url);
-      let skuname = `${skurl.sku}${file_ext}`
-      let prom = syscall(`curl -s -o ${tempdir}/${skuname} ${skurl.url}`);
-      promises.push(prom.then(
+      let fileext = getImageURLFileExtension(skurl.url);
+      let skuname = `${skurl.sku}${fileext}` // Make sure .jpg or .png from URL come along
+      let curl = syscall(`curl -s -o ${tempdir}/${skuname} ${skurl.url}`);
+      curl_promises.push(curl.then(
         success => {
           jlog(`curlImagePromise`, `(${grn}done${rst})  ${skuname} - from URL: ${skurl.url}`);
           let chunk = { request:`imagechunk`,result:`success`,file:skuname };
-          ws.send(JSON.stringify(chunk));
-        },
+          ws.send(JSON.stringify(chunk)); },
         err => { elog(`curlImagePromise Rejection`, err); }
       ).catch( e => { elog(`curlImagePromise Error`, e); }));
     } else {
@@ -98,26 +85,21 @@ async function processSkurls(skurls, tempdir, ws) {
     }
     count++;
   }
-  return Promise.all(promises);
+  return Promise.all(curl_promises);
 }
 
 function getImageURLFileExtension(url) {
   let ext_regex = /\.([0-9a-z]+)(?=[?#])|(\.)(?:[\w]+)$/gmi;
   let ext = ``;
-  if (url.match(ext_regex)) {
-    ext = url.match(ext_regex)[0];
-  }
+  if (url.match(ext_regex)) { ext = url.match(ext_regex)[0]; }
   return ext;
 }
 
 function buildLatestZip(image_dir) {
   if (fs.existsSync(LATESTZIP)) fs.unlinkSync(LATESTZIP);
   jlog(`buildLatestZip`, `Compressing contents of ${image_dir} to ${LATESTZIP}`);
-  try {
-    syscallSync(`zip -urj ${LATESTZIP} ${image_dir}/*`);
-  } catch (e) {
-    elog(`buildLatestZip`, e);
-  }
+  try { syscallSync(`zip -urj ${LATESTZIP} ${image_dir}/*`); }
+  catch (e) { elog(`buildLatestZip`, e);}
   if (fs.existsSync(LATESTZIP)) {
     archiveLatestZip(LATESTZIP); // Timestamp and cp to HISTDIR
     pruneHistoryDir(fs.readdirSync(HISTDIR)); // Prune the zip history when we add a new one
@@ -148,10 +130,12 @@ function archiveLatestZip(zipfile) {
 }
 
 function sendLatestZip(ws) {
-  let pack = getImageArchive(LATESTZIP);
-  ws.binaryType = `blob`; // Actually nodebuffer
-  jlog(`sendLatestZip`, `(${cyn}TRANSMIT${rst})  Sending ${LATESTZIP} to client.`);
-  ws.send(pack);
+  try {
+    let pack = fs.readFileSync(LATESTZIP)
+    ws.binaryType = `blob`; // Actually nodebuffer
+    jlog(`sendLatestZip`, `(${cyn}TRANSMIT${rst})  Sending ${LATESTZIP} to client.`);
+    ws.send(pack);
+  } catch (e) { elog(`sendLatestZip`, e); }
 }
 
 function getOldestHistZip(files) {
