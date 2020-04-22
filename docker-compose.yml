@@ -54,11 +54,14 @@ services:
       - NODE_ENV=production
     networks:
       - my-net
+    volumes:
+      - cover_data:/cover-data
     command: "node ./server.js"
 
 
 volumes:
   db_data:
+  cover_data:
 
 networks:
   my-net:
