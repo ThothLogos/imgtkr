@@ -20,12 +20,12 @@ const mag = `\x1b[35m`;
 const cyn = `\x1b[36m`;
 const wht = `\x1b[37m`;
 
-// Color Logging - Error, Warn, Job, Message, Cleanup, Setup
+// Color Logging - Error, Warn, Job, Message, Cleanup, Status
 function elog(src, err) { console.log(`[ ${red}${bld}!${rst} ${red}ERR${rst} ] ${src}\t\t${err}`);}
 function wlog(src, wrn) { console.log(`[ ${ylw}${bld}!${rst} ${ylw}WRN${rst} ] ${src}\t\t${wrn}`); }
 function jlog(src, msg) { console.log(`[ ${mag} JOB ${rst} ] ${src}\t\t${msg}`); }
 function mlog(src, msg) { console.log(`[${cyn}MESSAGE${rst}] ${src}\t\t${msg}`); }
-function cleanuplog(src, msg) { console.log(`[ ${ylw}CLEAN${rst} ] ${src}\t\t${msg}`); }
+function cleanuplog(src, msg) { console.log(`[${ylw}CLEANUP${rst}] ${src}\t\t${msg}`); }
 function statuslog(src, msg) { console.log(`[ ${blu}STATE${rst} ] ${src}\t\t${msg}`); }
 
 function getDateName() {
@@ -40,8 +40,7 @@ function getDateName() {
 }
 
 function isValidJSON(str) {
-  try { JSON.parse(str); }
-  catch (e) { return false; }
+  try { JSON.parse(str); } catch (e) { return false; }
   return true;
 }
 
@@ -50,23 +49,12 @@ function isValidImageURL(image_url) {
 }
 
 async function rateLimitTimeout() {
-  statuslog(`rateLimitTimeout`,`(${ylw}LIMIT${rst}) Set to ${BATCHSIZE} per ${BATCHTIME} ms`);
-  return new Promise( resolve => {
-    setTimeout( () => { resolve('resolved!'); }, BATCHTIME);
-  });
-}
-
-function getImageArchive(path) {
-  if (fs.existsSync(path)) {
-    jlog(`getImageArchive`, `Found archive at ${path}, attempting read...`);
-    return fs.readFileSync(path);
-  } else {
-    elog(`getImageArchive`, `Failed to locate .zip archive at ${path}`);
-  }
+  statuslog(`rateLimitTimeout`, `(${ylw}LIMIT${rst}) Set to ${BATCHSIZE} per ${BATCHTIME} ms`);
+  return new Promise( resolve => { setTimeout( () => { resolve('resolved!'); }, BATCHTIME); });
 }
 
 function createTempDir() {
-  let now = Date.now();
+  let now = Date.now(); // Returns unix-time seconds as our unique name for the tempdir
   if (!fs.existsSync(`${DATADIR}/${now}`)){
     try { fs.mkdirSync(`${DATADIR}/${now}`); }
     catch (e) { elog(`createTempDir`, e); }
@@ -75,39 +63,43 @@ function createTempDir() {
   return `${DATADIR}/${now}`;
 }
 
-async function processImageArray(imagelist, tempdir, ws) {
-  jlog(`processImageArray`, `Attempting to download images...`);
-  let promises = [];
+async function processSkurls(skurls, tempdir, ws) {
+  jlog(`processSkurls`, `Attempting to download images...`);
+  let curl_promises = [];
   let count = 1;
-  for (let image_url of imagelist) {
-    if (count % BATCHSIZE == 0) { await rateLimitTimeout(BATCHTIME); } // don't piss off imagehost
-    if (isValidImageURL(image_url)) {
-      let img = image_url.toString().split(`/`).pop();
-      let prom = syscall(`curl -s -o ${tempdir}/${img} ${image_url}`);
-      promises.push(prom.then(
-        success => { 
-          jlog(`curlImagePromise`, `(${grn}done${rst})  ${img} - from URL: ${image_url}`);
-          let chunk = { request:`imagechunk`,result:`success`,file:img };
-          ws.send(JSON.stringify(chunk));
-        },
+  for (let skurl of skurls) {
+    if (count % BATCHSIZE == 0) { await rateLimitTimeout(BATCHTIME); } // don't piss off imagehosts
+    if (isValidImageURL(skurl.url)) {
+      let fileext = getImageURLFileExtension(skurl.url);
+      let skuname = `${skurl.sku}${fileext}` // Make sure .jpg or .png from URL come along
+      let curl = syscall(`curl -s -o ${tempdir}/${skuname} ${skurl.url}`);
+      curl_promises.push(curl.then(
+        success => {
+          jlog(`curlImagePromise`, `(${grn}done${rst})  ${skuname} - from URL: ${skurl.url}`);
+          let chunk = { request:`imagechunk`,result:`success`,file:skuname };
+          ws.send(JSON.stringify(chunk)); },
         err => { elog(`curlImagePromise Rejection`, err); }
       ).catch( e => { elog(`curlImagePromise Error`, e); }));
     } else {
-      elog(`isValidImageURL`, `Failed to pass URL regex: ${image_url}`);
+      elog(`isValidImageURL`, `Failed to pass URL regex: ${skurl.url}`);
     }
     count++;
   }
-  return Promise.all(promises);
+  return Promise.all(curl_promises);
+}
+
+function getImageURLFileExtension(url) {
+  let ext_regex = /\.([0-9a-z]+)(?=[?#])|(\.)(?:[\w]+)$/gmi;
+  let ext = ``;
+  if (url.match(ext_regex)) { ext = url.match(ext_regex)[0]; }
+  return ext;
 }
 
 function buildLatestZip(image_dir) {
   if (fs.existsSync(LATESTZIP)) fs.unlinkSync(LATESTZIP);
   jlog(`buildLatestZip`, `Compressing contents of ${image_dir} to ${LATESTZIP}`);
-  try {
-    syscallSync(`zip -urj ${LATESTZIP} ${image_dir}/*`);
-  } catch (e) {
-    elog(`buildLatestZip`, e);
-  }
+  try { syscallSync(`zip -urj ${LATESTZIP} ${image_dir}/*`); }
+  catch (e) { elog(`buildLatestZip`, e);}
   if (fs.existsSync(LATESTZIP)) {
     archiveLatestZip(LATESTZIP); // Timestamp and cp to HISTDIR
     pruneHistoryDir(fs.readdirSync(HISTDIR)); // Prune the zip history when we add a new one
@@ -138,10 +130,12 @@ function archiveLatestZip(zipfile) {
 }
 
 function sendLatestZip(ws) {
-  let pack = getImageArchive(LATESTZIP);
-  ws.binaryType = `blob`; // Actually nodebuffer
-  jlog(`sendLatestZip`, `Sending ${LATESTZIP} to client.`);
-  ws.send(pack);
+  try {
+    let pack = fs.readFileSync(LATESTZIP)
+    ws.binaryType = `blob`; // Actually nodebuffer
+    jlog(`sendLatestZip`, `(${cyn}TRANSMIT${rst})  Sending ${LATESTZIP} to client.`);
+    ws.send(pack);
+  } catch (e) { elog(`sendLatestZip`, e); }
 }
 
 function getOldestHistZip(files) {
@@ -178,7 +172,7 @@ function cleanupTempDir(tempdir) {
   } catch (e) { elog(`cleanupTempDir`, e); }
 }
 
-statuslog(`${bld}${wht}STARTUP${rst}`, `Starting Node WebSocket server on 8011...`);
+statuslog(`\t${bld}${wht}STARTUP${rst}`, `\tStarting Node WebSocket server on 8011...`);
 var WebSocketServer = require(`ws`).Server;
 wss = new WebSocketServer({port: 8011});
 initHistoryDir();
@@ -187,23 +181,19 @@ wss.on(`connection`, function(ws) {
   ws.on(`message`, function(message) {
     if (isValidJSON(message)) {
       message = JSON.parse(message);
-      if (Array.isArray(message)) {
-        jlog(`${bld}${ylw}New ${rst}Request`, `processImageArray`);
-        // Tell client we got good data and expected image count
-        ws.send(JSON.stringify({request:`array`,result:`success`,size:message.length}));
-
-        // async curl the images and zip them up server-side
+      if (message.request == `processSkurls`) {
+        jlog(`${ylw}NEW${rst} Request`, `(${ylw}REQUEST${rst}) processSkurls -> calls processSkurls()`);
         let tempdir = createTempDir();
-        processImageArray(message, tempdir, ws).then( () => {
-          jlog(`processImageArray`, `(${grn}COMPLETE${rst})  Downloaded images saved to ${tempdir}/`);
+        ws.send(JSON.stringify({request:`processSkurls`,result:`received`,size:message.data.length}));
+        processSkurls(message.data, tempdir, ws).then( () => {
+          jlog(`processSkurls`, `(${grn}COMPLETE${rst})  Downloaded images saved to ${tempdir}/`);
           buildLatestZip(tempdir);
-          // Tell client we finished & send the latest.zip
-          ws.send(JSON.stringify({request:`array`,result:`success`,size:0}));
+          ws.send(JSON.stringify({request:`processSkurls`,result:`complete`,size:0}));
           sendLatestZip(ws);
           cleanupTempDir(tempdir); // We don't need to store the raw images anymore
         });
-      } else if (message.request == `getlatest`) {
-        jlog(`${bld}${ylw}New ${rst}Request`, `sendLatestZip`);
+      } else if (message.request == `getLatestZip`) {
+        jlog(`${ylw}NEW${rst} Request`, `(${ylw}REQUEST${rst}) getLatestZip -> calls sendLatestZip()`);
         sendLatestZip(ws);
       } else {
         mlog(`unhandledMessage`, `Unknown JSON request received: ${message}`);

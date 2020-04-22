@@ -58,40 +58,34 @@
         return true;
       }
 
-      // Generate some psuedo-random image sets so we get diff zips on retries
-      function generateImageArray() {
-        let imagelist = []; // This will be sent to the server via WebSocket
+      function genImageListRequest() {
+        let skurls = [];
+        // Generate some test URLs from Diamond Comics some fake SKUs we just make up
         let last4 = randomIntFromInterval(5000,9999);
-        for(let i = 105; i > 0; i--) {
-          //let last4 = randomIntFromInterval(1000,9999);
-          let str = `${url_root}/STL06${last4}.jpg`;
+        for(let i = 45; i > 0; i--) {
+          let urlref = `${url_root}/STL06${last4}.jpg`;
+          let skuname = `SKU${randomIntFromInterval(1000000, 9999900)}`;
           last4 -= 1;
-          imagelist.push(str);
+          skurls.push( { sku: skuname, url: urlref } );
         }
-        return imagelist;
-      }
-
-      function sendImageArray(imagelist) {
-        try { websock.send(JSON.stringify(imagelist)); }
-        catch (e) { dlog(`ERROR sendImageArray: ${e}`) };
+        return { request : "processSkurls", data: skurls };
       }
 
       function doGetZip() {
         disableButtons();
         dlog(`Sending image array to server.`);
-        sendImageArray(generateImageArray());
+        let list = genImageListRequest();
+        let json = JSON.stringify(list);
+        try { websock.send(json); }
+        catch (e) { dlog(`ERROR genImageListRequest send failed! ${e}`); }
       }
 
       function doGetLatest() {
         disableButtons();
         dlog(`Requesting previous latest.zip from server.`);
         lblStatus.textContent = `Waiting on zip from server...`;
-        try { websock.send(JSON.stringify({request:`getlatest`})); }
+        try { websock.send(JSON.stringify({request:`getLatestZip`})); }
         catch (e) { dlog(`ERROR doGetLatest: ${e}`); }
-      }
-
-      function timeout(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
       }
 
       function updateProgress(progress) {
@@ -128,23 +122,21 @@
           enableButtons();
         } else if (isValidJSON(msg.data)) {
           let res = JSON.parse(msg.data);
-          if (res.request == `array` && res.result == `success`) {
-            if (res.size != 0) {
-              progress.imagecount  = res.size;
-              progress.remaining   = res.size;
-              progress.currentprog = 0;
-              lblStatus.textContent = `Server received ${progress.imagecount} image URLs. Processing...`;
-              lblRequested.textContent = `${progress.imagecount}`;
-              dlog(`  (SERVER) Processing ${progress.imagecount} image URLs.`);
-              updateProgress(progress);
-            } else {
-              dlog(`  (SERVER) Done processing images. Sending zip.`);
-              lblStatus.textContent = `Waiting on zip from server...`;
-              progress.remaining  = 0;
-              progress.currentprog = 100;
-              lblRemaining.textContent = `0`;
-              updateProgress(progress);
-            }
+          if (res.request == `processSkurls` && res.result == `received`) {
+            progress.imagecount  = res.size;
+            progress.remaining   = res.size;
+            progress.currentprog = 0;
+            lblStatus.textContent = `Server received ${progress.imagecount} image URLs. Processing...`;
+            lblRequested.textContent = `${progress.imagecount}`;
+            dlog(`  (SERVER) Processing ${progress.imagecount} image URLs.`);
+            updateProgress(progress);
+          } else if (res.request == `processSkurls` && res.result == `complete`) {
+            dlog(`  (SERVER) Done processing images. Sending zip.`);
+            lblStatus.textContent = `Waiting on zip from server...`;
+            progress.remaining  = 0;
+            progress.currentprog = 100;
+            lblRemaining.textContent = `0`;
+            updateProgress(progress);
           } else if (res.request == `imagechunk` && res.result == `success`) {
             progress.remaining   -= 1;
             progress.currentprog += 100 / progress.imagecount;
