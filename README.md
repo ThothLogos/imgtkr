@@ -4,7 +4,7 @@
 
 - 4th container added to the stack - mostly default `node:12.16.2-alpine3.9` image with some additions: `zip`, `curl` and `npm install ws` (websocket lib).
 
-- Nginx confs modified to set up proxy_pass to websocket server on port `8011`.
+- Nginx confs modified to set up proxy_pass to websocket server on port `8011`. The only change to Nginx's docker-compose configuration is a new volume directive `./data/nginx.conf:/etc/nginx/nginx.conf` to install the modified conf.
 
 - `server.js` listens on `nodews` container at `8011`, any messages passed to the server are checked for their `message.request` property, which contain procotol keywords to trigger and track server-side events.
 
