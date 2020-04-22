@@ -61,8 +61,12 @@ let skurl = { sku : "SKU123098", url : "https://img.example.com/images/somepic00
   - Add way to access server history and select previous download
   - Stress test the server with unconventional requests: very large numbers, double-sends, etc.
   
-### Request Structure
-  
+# Request Structure
+
+## Client Requests
+
+__The server will respond to any WebSocket-sent JSON request follow the formats below:__
+
 Client request, sending image list:
   
 ```javascript
@@ -94,7 +98,9 @@ WebSocket.send(JSON.stringify(request));
 
 ```
 
-Server responses:
+## Server Responses
+
+__The server will also fire back event updates that can be used by the Vue front-end to provide feedback/updates to the user.__
   
 ```javascript
 // The server will affirm receipt of requests to the client
