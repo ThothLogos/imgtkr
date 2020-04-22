@@ -1,5 +1,5 @@
 #!/bin/bash
 
-docker-compose down && docker rmi thothlogos/nodews:0.1
-docker build -f ./Dockerfile -t thothlogos/nodews:0.1 . && docker-compose up
+docker-compose down && docker rmi docker-guttest_nodews:latest
+docker build -f ./Dockerfile -t docker-guttest_nodews:latest . && docker-compose up
 
