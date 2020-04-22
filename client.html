@@ -60,9 +60,7 @@
 
       function genImageListRequest() {
         let skurls = [];
-
-        // Generate some test URLs from Diamond Comics
-        // and some fake SKUs we just make up
+        // Generate some test URLs from Diamond Comics some fake SKUs we just make up
         let last4 = randomIntFromInterval(5000,9999);
         for(let i = 105; i > 0; i--) {
           let urlref = `${url_root}/STL06${last4}.jpg`;
@@ -73,33 +71,13 @@
         return { request : "processSkurls", data: skurls };
       }
 
-      // Generate some psuedo-random image sets so we get diff zips on retries
-      function generateImageArray() {
-        let imagelist = []; // This will be sent to the server via WebSocket
-        let last4 = randomIntFromInterval(5000,9999);
-        for(let i = 105; i > 0; i--) {
-          //let last4 = randomIntFromInterval(1000,9999);
-          let str = `${url_root}/STL06${last4}.jpg`;
-          last4 -= 1;
-          imagelist.push(str);
-        }
-        return imagelist;
-      }
-
-      function sendImageArray(imagelist) {
-        try { websock.send(JSON.stringify(imagelist)); }
-        catch (e) { dlog(`ERROR sendImageArray: ${e}`) };
-      }
-
       function doGetZip() {
         disableButtons();
         dlog(`Sending image array to server.`);
         let list = genImageListRequest();
-        dlog(`Raw list ${list}`);
         let json = JSON.stringify(list);
-        dlog(`\n\n${json}\n\n`);
-        try { websock.send(json);
-        } catch (e) { dlog(`ERROR genImageListRequest send failed! ${e}`); }
+        try { websock.send(json); }
+        catch (e) { dlog(`ERROR genImageListRequest send failed! ${e}`); }
       }
 
       function doGetLatest() {
@@ -108,10 +86,6 @@
         lblStatus.textContent = `Waiting on zip from server...`;
         try { websock.send(JSON.stringify({request:`getLatestZip`})); }
         catch (e) { dlog(`ERROR doGetLatest: ${e}`); }
-      }
-
-      function timeout(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
       }
 
       function updateProgress(progress) {
