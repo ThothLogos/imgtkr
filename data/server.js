@@ -1,5 +1,5 @@
 const fs          = require(`fs`);                                 // File reading->blob->xmit
-const util        = require('util');                               // Promise-wrapper for child_proc
+const util        = require(`util`);                               // Promise-wrapper for child_proc
 const syscall     = util.promisify(require(`child_process`).exec); // Promise-based syscall for curl
 const syscallSync = require(`child_process`).execSync;             // Synchronous syscall for zip/rm
 const ws          = require(`ws`).Server;                          // WebSocket lib
@@ -11,22 +11,22 @@ const LATESTZIP = `${DATADIR}/latest.zip`;      // Always references the most re
 
 // Magic numbers
 const MAXHIST   = 10;     // Limits how many historic zips we keep           pruneHistoryDir()
-const BATCHSIZE = 30;     // Max async requests per interval for curls       rateLimitTimeout()
-const BATCHTIME = 1250;   // Pause length in milliseconds for curl batches   rateLimitTimeout()
+const BSIZE = 30;     // Max async requests per interval for curls
+const BTIME = 1250;   // Pause length in milliseconds for curl batches   rateLimitTimeout()
 const PORT      = 8011;   // WebSocketServer will listen here
 
 // Descriptive ANSI color macros, saving char cols where I can
-const rst = `\x1b[0m`;
-const bld = `\x1b[1m`;
-const red = `\x1b[31m`;
-const grn = `\x1b[32m`;
-const ylw = `\x1b[33m`;
-const blu = `\x1b[34m`;
-const mag = `\x1b[35m`;
-const cyn = `\x1b[36m`;
-const wht = `\x1b[37m`;
+const rs = `\x1b[0m`;
+const bd = `\x1b[1m`;
+const rd = `\x1b[31m`;
+const gr = `\x1b[32m`;
+const yl = `\x1b[33m`;
+const bl = `\x1b[34m`;
+const mg = `\x1b[35m`;
+const cy = `\x1b[36m`;
+const wt = `\x1b[37m`;
 
-statuslog(`\t${bld}STARTUP${rst}`, `\tStarting Node WebSocket server on ${PORT}...`);
+slog(`\t${bd}STARTUP${rs}`, `\tStarting Node WebSocket server on ${PORT}...`);
 const WebSocketServer = new ws({port: PORT});
 
 initHistoryDir();       // Check the HISTDIR for setup/cleanup, potential call to pruneHistoryDir()
@@ -37,18 +37,19 @@ WebSocketServer.on(`connection`, function(socket) {
     if (isValidJSON(message)) {
       message = JSON.parse(message);
       if (message.request == `processSkurls`) {
-        jlog(`${ylw}NEW${rst} Request`, `(${ylw}REQUEST${rst}) processSkurls -> call processSkurls()`);
+        jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) processSkurls -> call processSkurls()`);
         let tempdir = createTempDir();
-        socket.send(JSON.stringify({request:`processSkurls`,result:`received`,size:message.data.length}));
+        let acknowledgement = {request:`processSkurls`,result:`received`,size:message.data.length};
+        socket.send(JSON.stringify(acknowledgement)); // Tell client we got the skurls and how many
         processSkurls(message.data, tempdir, socket).then( () => {
-          jlog(`processSkurls`, `(${grn}COMPLETE${rst})  Downloaded images saved to ${tempdir}/`);
+          jlog(`processSkurls`, `(${gr}COMPLETE${rs})  Downloaded images saved to ${tempdir}/`);
           buildLatestZip(tempdir);
           socket.send(JSON.stringify({request:`processSkurls`,result:`complete`,size:0}));
           sendLatestZip(socket);
           cleanupTempDir(tempdir); // We don't need to store the raw images anymore
         });
       } else if (message.request == `getLatestZip`) {
-        jlog(`${ylw}NEW${rst} Request`, `(${ylw}REQUEST${rst}) getLatestZip -> call sendLatestZip()`);
+        jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) getLatestZip -> call sendLatestZip()`);
         sendLatestZip(socket);
       } else {
         mlog(`unhandledMessage`, `Unknown JSON request received: ${message}`);
@@ -59,7 +60,7 @@ WebSocketServer.on(`connection`, function(socket) {
     }
   });
   socket.on(`close`, function () {
-    statuslog(`socketConnection`, `Connection with client closed.`);
+    slog(`socketConnection`, `Connection with client closed.`);
   });
 });
 
@@ -87,21 +88,24 @@ function createTempDir() {
  *  - Writes those images to a tempdir with new filenames based on their SKU
  *  - Sends the client an "imagechunk" success object for each successful download (progress update)
  *  - Returns Promise.all that allows the server to wait for all curls to complete before proceeding
- *  - Rate Limiting is configurable with BATCHSIZE and BATCHTIME constants
+ *  - Rate Limiting is configurable with BSIZE and BTIME constants
  */
 async function processSkurls(skurls, tempdir, socket) {
   jlog(`processSkurls`, `Attempting to download images...`);
   let curl_promises = [];
-  let count = 1; // Used to enforce BATCHSIZE rateLimitTimeout()
+  let count = 1; // Used to enforce BSIZE rateLimitTimeout()
   for (let skurl of skurls) {
-    if (count % BATCHSIZE == 0) { await rateLimitTimeout(BATCHTIME); } // don't piss off imagehosts
+    if (count % BSIZE == 0) {
+      slog(`processSkurls`, `(${yl}LIMIT${rs}) Enforcing rateLimitTimeout() every ${BSIZE} curls.`);
+      await rateLimitTimeout(BTIME); // don't piss off imagehosts
+    }
     if (isValidImageURL(skurl.url)) {
       let fileext = getImageURLFileExtension(skurl.url);
       let skuname = `${skurl.sku}${fileext}` // Make sure .jpg or .png from URL come along
       let curl = syscall(`curl -s -o ${tempdir}/${skuname} ${skurl.url}`);
       curl_promises.push(curl.then(
         success => {
-          jlog(`curlImagePromise`, `(${grn}done${rst})  ${skuname} - from URL: ${skurl.url}`);
+          jlog(`curlImagePromise`, `(${gr}done${rs})  ${skuname} - from URL: ${skurl.url}`);
           let chunk = { request:`imagechunk`,result:`success`,file:skuname };
           socket.send(JSON.stringify(chunk)); }, // Send client notifications for each image success
         err => { elog(`curlImagePromise Rejection`, err); }
@@ -143,7 +147,7 @@ function sendLatestZip(socket) {
   try {
     let pack = fs.readFileSync(LATESTZIP)
     socket.binaryType = `blob`; // Actually nodebuffer
-    jlog(`sendLatestZip`, `(${cyn}TRANSMIT${rst})  Sending ${LATESTZIP} to client.`);
+    jlog(`sendLatestZip`, `(${cy}TRANSMIT${rs})  Sending ${LATESTZIP} to client.`);
     socket.send(pack);
   } catch (e) { elog(`sendLatestZip`, e); }
 }
@@ -160,11 +164,11 @@ function initHistoryDir() {
   if (!fs.existsSync(HISTDIR)) {
     try { fs.mkdirSync(HISTDIR); }
     catch (e) { elog(`initHistoryDir`, e); }
-    statuslog(`initHistoryDir`, `No zip history folder found, created ${HISTDIR}`);
+    slog(`initHistoryDir`, `No zip history folder found, created ${HISTDIR}`);
   } else {
     try {
       let files = fs.readdirSync(HISTDIR);
-      statuslog(`initHistoryDir`, `History directory holds ${files.length} previous zips.`);
+      slog(`initHistoryDir`, `History directory holds ${files.length} previous zips.`);
       pruneHistoryDir(files);
     } catch (e) { elog(`initHistoryDir`, e); }
   }
@@ -203,7 +207,7 @@ function pruneHistoryDir(files) {
         cleanuplog(`pruneHistoryDir`, `Removed ${oldest}`);
       } catch (e) { elog(`pruneHistoryDir`, e); }
     }
-    cleanuplog(`pruneHistoryDir`, `(${grn}COMPLETE${rst})  Pruned ${HISTDIR} down to ${MAXHIST}`);
+    cleanuplog(`pruneHistoryDir`, `(${gr}COMPLETE${rs})  Pruned ${HISTDIR} down to ${MAXHIST}`);
   }
 }
 
@@ -211,7 +215,7 @@ function pruneHistoryDir(files) {
 function cleanupTempDir(tempdir) {
   try {
     syscallSync(`rm -r ${tempdir}`);
-    cleanuplog(`cleanupTempDir`, `(${grn}COMPLETE${rst})  Removed temporary directory ${tempdir}`);
+    cleanuplog(`cleanupTempDir`, `(${gr}COMPLETE${rs})  Removed temporary directory ${tempdir}`);
   } catch (e) { elog(`cleanupTempDir`, e); }
 }
 
@@ -224,8 +228,8 @@ function cleanupTempDir(tempdir) {
 // Used during processSkurls() asynchronous curl calls to slow them down
 // Better to rate-limit ourselves than fail curls b/c the target host blocked us
 async function rateLimitTimeout() {
-  statuslog(`rateLimitTimeout`, `(${ylw}LIMIT${rst}) Set to ${BATCHSIZE} per ${BATCHTIME} ms`);
-  return new Promise( resolve => { setTimeout( () => { resolve('resolved!'); }, BATCHTIME); });
+  slog(`rateLimitTimeout`, `(${yl}LIMIT${rs}) Paused for ${BTIME} ms.`);
+  return new Promise( resolve => { setTimeout( () => { resolve(`resolved!`); }, BTIME); });
 }
 
 // Extract file extensions from URLs (hopefully)
@@ -284,9 +288,9 @@ function getDateName() {
 }
 
 // Color Logging - Error, Warn, Job, Message, Cleanup, Status
-function elog(src, err) { console.log(`[ ${red}${bld}!${rst} ${red}ERR${rst} ] ${src}\t${err}`);}
-function wlog(src, wrn) { console.log(`[ ${ylw}${bld}!${rst} ${ylw}WRN${rst} ] ${src}\t${wrn}`); }
-function jlog(src, msg) { console.log(`[ ${mag} JOB ${rst} ] ${src}\t${msg}`); }
-function mlog(src, msg) { console.log(`[${cyn}MESSAGE${rst}] ${src}\t${msg}`); }
-function cleanuplog(src, msg) { console.log(`[${ylw}CLEANUP${rst}] ${src}\t${msg}`); }
-function statuslog(src, msg) { console.log(`[ ${blu}STATE${rst} ] ${src}\t${msg}`); }
+function elog(src, err) { console.log(`[ ${rd}${bd}!${rs} ${rd}ERR${rs} ] ${src}\t${err}`);}
+function wlog(src, wrn) { console.log(`[ ${yl}${bd}!${rs} ${yl}WRN${rs} ] ${src}\t${wrn}`); }
+function jlog(src, msg) { console.log(`[ ${mg} JOB ${rs} ] ${src}\t${msg}`); }
+function mlog(src, msg) { console.log(`[${cy}MESSAGE${rs}] ${src}\t${msg}`); }
+function cleanuplog(src, msg) { console.log(`[${yl}CLEANUP${rs}] ${src}\t${msg}`); }
+function slog(src, msg) { console.log(`[ ${bl}STATE${rs} ] ${src}\t${msg}`); }
