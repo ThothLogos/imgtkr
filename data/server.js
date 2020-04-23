@@ -65,6 +65,12 @@ WebSocketServer.on(`connection`, function(socket) {
 });
 
 
+// Attempt to shutdown before forced kill from docker
+process.once('SIGTERM', () => {
+  slog(`shutdownProcess`, `(${rd}SIGTERM${rs}) Attempting graceful shutdown...`);
+  WebSocketServer.close();
+});
+
 
 /* * * * * * * * * * * * * * * * * *
  *   REQUEST-PROCESSING FUNCTIONS  *
