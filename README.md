@@ -141,3 +141,27 @@ __The server will also fire back event updates that can be used by the Vue front
   result  : "received"
 }
 ```
+## Client Handling of Server Responses Example
+
+```javascript
+
+socket.onmessage = function(message) {
+  if (message.data instanceof Blob) {
+    // zip must be coming, do zip stuff
+    // saveAs() from File-Saver.js
+  } else if (isValidJSON(message.data)) {
+    let server_response = JSON.parse(message.data);
+    if (server_response.request == `processSkurls` && server_response.result == `received`) {
+      // Server is acknowledging receipt of the processSkurls request
+      document.getElementbyID(`status-box`).textContent = "Server received request.";
+    } else if (server_response.request == `processSkurls` && server_response.result == `complete`) {
+      // Server is telling us the entire Skurl request is finished
+      document.getElementbyID(`status-bar`).textContent = "Server image downloads complete");
+    } else if (server_response.request == `getLatestZip` && server_response.result == `received`) {
+      // Server acknowledging request for a re-download of the most recent zip
+    }
+  } else {
+    console.log(`Unrecognized message: ${message.data`};
+  }
+}
+```
