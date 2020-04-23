@@ -34,6 +34,20 @@ let request = { request : "getLatestZip" };
 WebSocket.send(JSON.stringify(request));
 
 ```
+Client request, asking for a list of old zips still archived on the server:
+
+```javascript
+let request = { request : "getZipHistory" };
+WebSocket.send(JSON.stringify(request));
+```
+Client request, asking to download one of the old zips by filename:
+
+```javascript
+
+let request = { request : "getZipByName", zipname: "somefileIwant.zip" };
+WebSocket.send(JSON.stringify(request));
+```
+
 
 ## Server Responses
 
@@ -68,9 +82,23 @@ __The server will also fire back event updates that can be used by the Vue front
 
 // Server confirms receipt of a getLatestZip request
 // UI status update: "Server is re-sending most recent zip..."
-}
+{
   request : "getLatestZip",
   result  : "received"
+}
+
+// Server responding to getZipHistory request with an array of filenames:
+// (this is the contents of the HISTDIR location on the server /cover-data/previous_zips/)
+{
+  request : "getZipHistory",
+  data    : [ "2020-04-22_235057.zip", "2020-04-21_21726.zip", ... ]
+}
+
+// Server lets Client know if the requested getZipByName is not found:
+{
+  request : "getZipByName",
+  result  : "notfound",
+  zipname : "thisfilenamewasntfound.zip"
 }
 ```
 ## Client Handling of Server Responses Example
@@ -130,10 +158,6 @@ let skurl = { sku : "SKU123098", url : "https://img.example.com/images/somepic00
   
 - __Server TODOs:__
 
-  - Cleanup on startup for potential tempdir orphans
-  - Allow client to request a specific historic zip by name
-  - Need to trap server's failure and do cleanup/graceful shutdown.
-  - Can we simplify the shared volume situation? Does nginx even need modification now?
   - Stress test, run the client script with hundreds of requests - try to double/triple-run before conclusion, etc.
   
  ### Client-side
@@ -145,6 +169,5 @@ let skurl = { sku : "SKU123098", url : "https://img.example.com/images/somepic00
 - __Client TODOs:__
 
   - Handle refreshes - it kills the client end of the socket apparently? Can we trap the close/refresh and post a message to the server before we die so it can wind-down & cleanup?
-  - Add way to access server history and select previous download
   - Stress test the server with unconventional requests: very large numbers, double-sends, etc.
   
