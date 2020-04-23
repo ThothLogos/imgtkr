@@ -11,8 +11,8 @@ const LATESTZIP = `${DATADIR}/latest.zip`;      // Always references the most re
 
 // Magic numbers
 const MAXHIST   = 10;     // Limits how many historic zips we keep           pruneHistoryDir()
-const BSIZE = 30;     // Max async requests per interval for curls
-const BTIME = 1250;   // Pause length in milliseconds for curl batches   rateLimitTimeout()
+const BSIZE = 30;         // Max async requests per interval for curls
+const BTIME = 1250;       // Pause length in milliseconds for curl batches   rateLimitTimeout()
 const PORT      = 8011;   // WebSocketServer will listen here
 
 // Descriptive ANSI color macros, saving char cols where I can
@@ -51,6 +51,13 @@ WebSocketServer.on(`connection`, function(socket) {
       } else if (message.request == `getLatestZip`) {
         jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) getLatestZip -> call sendLatestZip()`);
         sendLatestZip(socket);
+      } else if (message.request == `getZipHistory`) {
+        jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) getZipHistory -> call sendZipHistory()`);
+        sendZipHistory(socket);
+      } else if (message.request == `getZipByName`) {
+        let file = message.zipname;
+        jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) getZipByName -> call sendZipByName(${file})`);
+        sendZipByName(file, socket);
       } else {
         mlog(`unhandledMessage`, `Unknown JSON request received: ${message}`);
       }
@@ -72,21 +79,11 @@ process.once('SIGTERM', () => {
 });
 
 
+
 /* * * * * * * * * * * * * * * * * *
  *   REQUEST-PROCESSING FUNCTIONS  *
  * * * * * * * * * * * * * * * * * */
 
-
-// Ensures the temporary directory exists that we will curl images into, for a fresh latest.zip
-function createTempDir() {
-  let now = Date.now(); // Returns unix-time seconds as our unique name for the tempdir
-  if (!fs.existsSync(`${DATADIR}/${now}`)){
-    try { fs.mkdirSync(`${DATADIR}/${now}`); }
-    catch (e) { elog(`createTempDir`, e); }
-    jlog(`createTempDir`, `Created temporary processing directory: ${DATADIR}/${now}`);
-  }
-  return `${DATADIR}/${now}`;
-}
 
 /* The workhorse. Called when a fresh processSkurls request object arrives.
  *  - Asynchronously blasts off curl requests for each url in the request
@@ -124,6 +121,17 @@ async function processSkurls(skurls, tempdir, socket) {
   return Promise.all(curl_promises);
 }
 
+// Ensures the temporary directory exists that we will curl images into, for a fresh latest.zip
+function createTempDir() {
+  let now = Date.now(); // Returns unix-time seconds as our unique name for the tempdir
+  if (!fs.existsSync(`${DATADIR}/${now}`)){
+    try { fs.mkdirSync(`${DATADIR}/${now}`); }
+    catch (e) { elog(`createTempDir`, e); }
+    jlog(`createTempDir`, `Created temporary processing directory: ${DATADIR}/${now}`);
+  }
+  return `${DATADIR}/${now}`;
+}
+
 // Creates a fresh latest.zip once processSkurls() has completed
 // Calls archiveLatestZip and pruneHistoryDir
 function buildLatestZip(image_dir) {
@@ -156,6 +164,32 @@ function sendLatestZip(socket) {
     jlog(`sendLatestZip`, `(${cy}TRANSMIT${rs})  Sending ${LATESTZIP} to client.`);
     socket.send(pack);
   } catch (e) { elog(`sendLatestZip`, e); }
+}
+
+// Generates an array of filenames in the HISTDIR, and sends them as JSON to the client
+function sendZipHistory(socket) {
+  try {
+    let zipnames = getFileNamesAt(HISTDIR);
+    let response = { request:`getZipHistory`, data: zipnames };
+    socket.send(JSON.stringify(response));
+    jlog(`sendZipHistory`, `(${gr}COMPLETE${rs}) Sent contents of ${HISTDIR} to client.`);
+  } catch (e) { elog(`sendZipHistory`, e); }
+}
+
+function sendZipByName(zipname, socket) {
+  let path = `${HISTDIR}/${zipname}`;
+  if (fs.existsSync(path)) {
+    try {
+      let pack = fs.readFileSync(path);
+      socket.binaryType = `blob`; // Actually nodebuffer
+      jlog(`sendZipByName`, `(${cy}TRANSMIT${rs})  Sending ${path} to client.`);
+      socket.send(pack);
+    } catch (e) { elog(`sendZipByName`, e); }
+  } else {
+    let fail_response = {request:`getZipByName`,result:`notfound`,zipname: path};
+    socket.send(JSON.stringify(fail_response));
+    jlog(`sendZipByName`, `(${rd}FAIL${rs}) Client requested file not found on server (${path})`);
+  }
 }
 
 
@@ -267,6 +301,10 @@ function isTempImageDir(dir) {
 // Return list of directories within target path
 function getDirNamesAt(path) {
   return fs.readdirSync(path, {withFileTypes:true}).filter(d => d.isDirectory()).map(d => d.name);
+}
+
+function getFileNamesAt(path) {
+  return fs.readdirSync(path, {withFileTypes:true}).filter(d => !d.isDirectory()).map(d => d.name);
 }
 
 // Verify JSON is valid before we attempt to use it, used by WebSocketServer for parsing requests

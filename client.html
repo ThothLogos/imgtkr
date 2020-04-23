@@ -11,6 +11,9 @@
     </div>
     <button id="btnGetZip">Send Array (New Zip)</button>
     <button id="btnGetLatest">Get Latest Zip</button>
+    <button id="btnGetZipHistory">Zip History</button>
+    <button id="btnGetZipByName">Get Specific Zip:</button>
+    <input id="txtZipName"></input>
     <button id="btnClearLog" style="float: right">Clear Log</button>
     <div style="width:70%">
       <div id="counts" style="font-family: monospace;">
@@ -88,23 +91,22 @@
         catch (e) { dlog(`ERROR doGetLatest: ${e}`); }
       }
 
-      function updateProgress(progress) {
-        lblRemaining.textContent = `${progress.remaining}`;
-        progressBar.style.width = `${Math.floor(progress.currentprog)}%`;
+      function doGetZipHistory() {
+        dlog(`Requesting history of zips from server.`);
+        try { websock.send(JSON.stringify({request:`getZipHistory`})); }
+        catch (e) { dlog(`ERROR doGetZipHistory: ${e}`); }
       }
 
-      function disableButtons() {
-        btnGetZip.disabled = true;
-        btnGetLatest.disabled = true;
-        btnGetZip.removeEventListener(`click`, doGetZip);
-        btnGetLatest.removeEventListener(`click`, doGetLatest);
-      }
-
-      function enableButtons() {
-        btnGetZip.disabled = false;
-        btnGetLatest.disabled = false;
-        btnGetZip.addEventListener(`click`, doGetZip);
-        btnGetLatest.addEventListener(`click`, doGetLatest);
+      function doGetZipByName() {
+        let zipname = txtZipName.value;
+        if (/\.zip$/i.test(zipname)) {
+          disableButtons();
+          dlog(`Requesting ${zipname} from server...`);
+          let request = {request:`getZipByName`, zipname:`${zipname}` };
+          websock.send(JSON.stringify(request));
+        } else {
+          dlog(`Please enter a valid zipname. (ends in .zip!)`);
+        }
       }
 
       websock.onopen = function(event) {
@@ -142,6 +144,11 @@
             progress.currentprog += 100 / progress.imagecount;
             dlog(`  (SERVER) ${res.file} retrieved, ${progress.remaining} in queue.`);
             updateProgress(progress);
+          } else if (res.request == `getZipHistory`) {
+            dlog(`Server has the last ${res.data.length} zips,from oldest to newest):`);
+            dlog(res.data.join('\n'));
+          } else if (res.request == `getZipByName` && res.result == `notfound`) {
+            dlog(`Request ERR: This file was not found on the server: ${res.zipname}`);
           } else {
             dlog(`Unknown JSON response: ${res}`);
           }
@@ -152,7 +159,28 @@
 
       btnGetZip.addEventListener(`click`, doGetZip);
       btnGetLatest.addEventListener(`click`, doGetLatest);
+      btnGetZipHistory.addEventListener(`click`, doGetZipHistory);
+      btnGetZipByName.addEventListener(`click`, doGetZipByName);
       btnClearLog.addEventListener(`click`, event => { txtLog.value = ``; });
+
+      function updateProgress(progress) {
+        lblRemaining.textContent = `${progress.remaining}`;
+        progressBar.style.width = `${Math.floor(progress.currentprog)}%`;
+      }
+
+      function disableButtons() {
+        btnGetZip.disabled = true;
+        btnGetLatest.disabled = true;
+        btnGetZip.removeEventListener(`click`, doGetZip);
+        btnGetLatest.removeEventListener(`click`, doGetLatest);
+      }
+
+      function enableButtons() {
+        btnGetZip.disabled = false;
+        btnGetLatest.disabled = false;
+        btnGetZip.addEventListener(`click`, doGetZip);
+        btnGetLatest.addEventListener(`click`, doGetLatest);
+      }
 
       </script>
   </body>
