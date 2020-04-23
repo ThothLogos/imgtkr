@@ -77,7 +77,7 @@ __The server will also fire back event updates that can be used by the Vue front
 
 ```javascript
 
-socket.onmessage = function(message) {
+socket.onmessage = (message) => {
   if (message.data instanceof Blob) {
     // zip must be coming, do zip stuff
     // saveAs() from File-Saver.js
