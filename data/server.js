@@ -11,8 +11,8 @@ const LATESTZIP = `${DATADIR}/latest.zip`;      // Always references the most re
 
 // Magic numbers
 const MAXHIST   = 10;     // Limits how many historic zips we keep           pruneHistoryDir()
-const BSIZE     = 50;     // Max async requests per interval for curls
-const BTIME     = 1000;   // Pause length in milliseconds for curl batches   rateLimitTimeout()
+const BSIZE     = 40;     // Max async requests per interval for curls
+var   BTIME     = 50;   // Pause length in milliseconds for curl batches   rateLimitTimeout()
 const PORT      = 8011;   // WebSocketServer will listen here
 
 const MAXRETRIES = 3;
@@ -43,12 +43,13 @@ WebSocketServer.on(`connection`, function(socket) {
         let tempdir = createTempDir();
         let acknowledgement = {request:`processSkurls`,result:`received`,size:message.data.length};
         socket.send(JSON.stringify(acknowledgement)); // Tell client we got the skurls and how many
-        processSkurls(message.data, tempdir, socket).then( () => {
+        processSkurlsBatcher(message.data, tempdir, socket).then( () => {
           jlog(`processSkurls`, `(${gr}COMPLETE${rs})  Downloaded images saved to ${tempdir}/`);
           buildLatestZip(tempdir);
           socket.send(JSON.stringify({request:`processSkurls`,result:`complete`,size:0}));
           sendLatestZip(socket);
           cleanupTempDir(tempdir); // We don't need to store the raw images anymore
+          BTIME = 250;
         });
       } else if (message.request == `getLatestZip`) {
         jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) getLatestZip -> call sendLatestZip()`);
@@ -131,8 +132,64 @@ async function processSkurls(skurls, tempdir, socket) {
   await Promise.all(curl_promises); // Allow the full round of requests to finish
   if (skurl_retries.length > 0) { // We may have had some failed curls - we'll retry them
     jlog(`processSkurls`, `(${yl}RETRIES${rs}) ${skurl_retries.length} failed, retrying...`);
+    BTIME += 500;
     await processSkurls(skurl_retries, tempdir, socket); // Recurse our failures (what a metaphor)
   }
+}
+
+async function processSkurlsBatcher(skurls, tempdir, socket) {
+  let skurl_batch       = [];
+  let count             = 1;
+  for (let skurl of skurls) {
+    if (isValidImageURL(skurl.url)) {
+      if (count % BSIZE == 0 && count != skurls.length) {
+        slog(`processSkurls`, `(${yl}LIMIT${rs}) Enforcing rateLimitTimeout() every ${BSIZE} curls.`);
+        await processSkurlBatch(skurl_batch, tempdir, socket)
+        await rateLimitTimeout(BTIME); // don't piss off imagehosts
+        skurl_batch = [];
+      } else {
+        skurl_batch.push(skurl);
+      }
+      if ((skurls.length - count) < BSIZE && skurl_batch > 0) {
+
+        // TODO figure out this last batch that goes missing...
+        console.log(`Special case triggered count at ${count}`);
+        await processSkurlsBatcher(skurl_batch, tempdir, socket);
+      }
+    } else { elog(`isValidImageURL`, `Failed to pass URL regex: ${skurl.url}`); }
+    count++;
+  }
+}
+
+async function processSkurlBatch(skurls, tempdir, socket) {
+  let curl_promises = [];
+  let skurl_retries = [];
+  let rm = skurls.length;
+  let ct = 0;
+  for (let skurl of skurls) {
+    let fileext = getImageURLFileExtension(skurl.url);
+    let skuname = `${skurl.sku}${fileext}` // Make sure .jpg or .png from URL come along
+    let curl = syscall(`curl -s -o ${tempdir}/${skuname} ${skurl.url}`);
+    curl_promises.push(curl.then(
+      success => {
+        ct += 1;
+        jlog(`curlImagePromise`, `(${gr}done${rs}) ${ct}/${rm} ${skuname} - from URL: ${skurl.url}`);
+        let chunk = { request:`imagechunk`,result:`success`,file:skuname };
+        socket.send(JSON.stringify(chunk)); }, // Send client notifications for each image success
+      err => { 
+        if (err.code == 7) {
+          wlog(`curlImagePromise`, `(7) CURLE_COULDNT_CONNECT \t ${skurl.url}`);
+          skurl_retries.push(skurl);
+        } else { elog(`curlImagePromise`, `${err.code} - ${err}`); }
+    }).catch( e => { elog(`curlImagePromise`, e); }));
+  }
+
+  await Promise.all(curl_promises); // Allow the full round of requests to finish
+  if (skurl_retries.length > 0) { // We may have had some failed curls - we'll retry them
+    jlog(`processSkurlBatch`, `(${yl}RETRIES${rs}) ${skurl_retries.length} failed, retrying...`);
+    BTIME += 200;
+    await processSkurlsByTheBatch(skurl_retries, tempdir, socket); // Recurse our failures (what a metaphor)
+  } else { BTIME <= 25 ? BTIME = 25 : BTIME -= 25; }
 }
 
 // Ensures the temporary directory exists that we will curl images into, for a fresh latest.zip
