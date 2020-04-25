@@ -47,7 +47,11 @@ Client request, asking to download one of the old zips by filename:
 let request = { request : "getZipByName", zipname: "somefileIwant.zip" };
 WebSocket.send(JSON.stringify(request));
 ```
-
+Client request for the current server-version:
+```javascript
+let request = { request: "getServerVersion" }
+WebSocket.send(JSON.stringify(request));
+```
 
 ## Server Responses
 
@@ -78,6 +82,15 @@ __The server will also fire back event updates that can be used by the Vue front
   request : "processSkurls",
   result  : "complete",
   size    : 0
+}
+
+// Some skurls may fail! Could be a bad url, for example - a report will come back:
+{
+  request : "processSkurls",
+  result  : "failures",
+  data    : [ { sku:"SKU0000", url:"http://doesnotexist.com"},
+              { sku:"SKU0001", url:"htts://badprotocol" },
+              ... ]
 }
 
 // Server confirms receipt of a getLatestZip request
