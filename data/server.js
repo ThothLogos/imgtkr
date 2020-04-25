@@ -105,7 +105,7 @@ async function processSkurls(skurls, tempdir, socket) {
         batch_count++;
         jlog(`processSkurls`, `(BATCH) Batch ${batch_count} ` + 
              `\tCurls in batch: ${skurl_batch.length}\tBatch size: ${BSIZE}`);
-        slog(`processSkurls`, `(${bl}WAIT${rs}) Waiting for batch completion...`);
+        jlog(`processSkurls`, `(${bl}WAIT${rs}) Waiting for batch completion...`);
         await processSkurlBatch(skurl_batch, tempdir, socket);
         jlog(`processSkurls`, `(${gr}COMPLETE${rs}) Batch #${batch_count} has finished!`);
         await rateLimitTimeout(10); // give the server a brief window to close up some procs
