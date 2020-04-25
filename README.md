@@ -101,7 +101,7 @@ __The server will also fire back event updates that can be used by the Vue front
   zipname : "thisfilenamewasntfound.zip"
 }
 ```
-## Client Handling of Server Responses Example
+## Client Handling of Server Responses Examples
 
 ```javascript
 
@@ -146,10 +146,14 @@ let skurl = { sku : "SKU123098", url : "https://img.example.com/images/somepic00
 - Current process for handling the `processSkurls` request type:
 
   - create a temporary directory named with a unix-timestamp
-  - do asynchronous calls to `curl` for each image, using a `setTimeout` promise to rate-limit
+  - `processSkurls()` uses the `BSIZE` constant to count up and fire-off batches of curls at a time (basically it self-limits the maximum number of concurrent curl processes that can be spun up)
+  - each batch is allowed to fully finish before the next is processed
+  - batches are passed off to `processSkurlBatch()` which does the work
+  - do asynchronous calls to `curl` for each image in the batch
   - use regex capture on each `skurl.url` to get the `file_ext` ie jpg, png, etc
-  - use the `skurl.sku` property with the `file_ext` to rename files to `${skurl.sku}.${file_ext}`. This happens as part of the `curl` command's parameters.
-  - after all `curl` calls return, perform synchronous syscall to `zip` to package all SKUnamed images, placing the resultant file at `/cover-data/latest.zip`
+  - use the `skurl.sku` along with the captured `file_ext` to rename files to `${skurl.sku}.${file_ext}`. The actual re-naming happens as part of the `curl` command's parameters.
+  - after all `curl` calls return in the batch, control is passed back to `processSkurls()` to get the next batch
+  - after all batches complete, perform synchronous syscall to `zip` to package all SKUnamed images, placing the resultant file at `/cover-data/latest.zip`
   - do `fs.readFileSync()` on the finished zip, prep binary data for transfer
   - set `ws.binaryType = 'blob'`
   - perform `websocket.send()` to push zipfile to client
