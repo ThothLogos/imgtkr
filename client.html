@@ -33,7 +33,7 @@
     <script src="./jslib/FileSaver.js"></script>
     <script>
       const PORT = 8011;
-      const REQ_COUNT = 112;
+      const REQ_COUNT = 527;
 
       const btnGetZip    = document.getElementById(`btnGetZip`);
       const btnGetLatest = document.getElementById('btnGetLatest');
@@ -45,6 +45,9 @@
       const lblRemaining = document.getElementById(`lblRemaining`);
       const websock      = new WebSocket(`ws://localhost:${PORT}`);
       const url_root = `https://retailerservices.diamondcomics.com/Image/ItemMainImageLowRes`;
+
+      const prot_fail = { sku: `dontmatter`, url: `hts://retailerservices.diamondcomics.com/` };
+      const url_fail = { sku: `notaurl`, url: `notaurl` };
 
       let progress = { imagecount : 0, remaining: 0, currentprog : 0 };
 
@@ -69,6 +72,8 @@
 
       function genImageListRequest() {
         let skurls = [];
+        skurls.push(prot_fail);
+        skurls.push(url_fail);
         // Generate some test URLs from Diamond Comics some fake SKUs we just make up
         let last4 = randomIntFromInterval(5000,9999);
         for(let i = REQ_COUNT; i > 0; i--) {
@@ -76,6 +81,8 @@
           let skuname = `SKU${randomIntFromInterval(1000000, 9999900)}`;
           last4 -= 1;
           skurls.push( { sku: skuname, url: urlref } );
+          if (i % 96 == 0) skurls.push(url_fail);
+          if (i % 83 == 0) skurls.push(prot_fail);
         }
         return { request : "processSkurls", data: skurls };
       }
