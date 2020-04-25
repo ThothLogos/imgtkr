@@ -105,9 +105,8 @@ async function processSkurls(skurls, tempdir, socket) {
         batch_count++;
         jlog(`processSkurls`, `Starting Batch ${batch_count} ` +
              `\tBatch size (configured): ${BSIZE}\tCurls in batch: ${skurl_batch.length}`);
-        jlog(`processSkurls`, `(${bl}WAIT${rs}) Waiting for batch completion...`);
         await processSkurlBatch(skurl_batch, tempdir, socket);
-        jlog(`processSkurls`, `(${gr}COMPLETE${rs}) Batch #${batch_count} has finished!`);
+        jlog(`processSkurls`, `(${gr}done${rs}) Batch ${batch_count} has finished!`);
         await rateLimitTimeout(10); // give the server a brief window to close up some procs
         skurl_batch = [];
       }
@@ -124,6 +123,7 @@ async function processSkurls(skurls, tempdir, socket) {
  *  - Returns Promise.all that allows processSkurls to wait for each batch to complete before proceeding
  */
 async function processSkurlBatch(skurls, tempdir, socket) {
+  jlog(`processSkurlBatch`, `(${bl}wait${rs}) Processing skurl batch...`);
   let curl_promises = [];
   let skurl_retries = [];
   for (let skurl of skurls) {
