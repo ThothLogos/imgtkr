@@ -5,8 +5,8 @@ RUN apk add --no-cache curl
 RUN mkdir /cover-data
 RUN chown node:node /cover-data
 
-COPY ./data/package.json ./package.json
-COPY ./data/server.js ./server.js
+COPY package.json ./package.json
+COPY server.js ./server.js
 RUN npm install ws
 
 EXPOSE 8011
