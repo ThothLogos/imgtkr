@@ -155,7 +155,7 @@ let skurl = { sku : "SKU123098", url : "https://img.example.com/images/somepic00
   - after all `curl` calls return in the batch, control is passed back to `processSkurls()` to get the next batch
   - after all batches complete, perform synchronous syscall to `zip` to package all SKUnamed images, placing the resultant file at `/cover-data/latest.zip`
   - do `fs.readFileSync()` on the finished zip, prep binary data for transfer
-  - set `ws.binaryType = 'blob'`
+  - set `websocket.binaryType = 'blob'`
   - perform `websocket.send()` to push zipfile to client
   - `cp` the fresh `latest.zip` to `/cover-data/previous_zips/` and rename with datetime, ie `2020-04-21_191039.zip`
   - perform auto-cleanup using `const MAXHIST` to determine how many historical zips to keep. This runs when any new zips are made and during server startup, prevent container filesystem bloat. Historical zips are kept in-case of oh-shit need, and for a future potential feature to allow the user to access previous archives for re-download.
