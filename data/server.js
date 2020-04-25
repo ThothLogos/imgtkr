@@ -50,7 +50,7 @@ WebSocketServer.on(`connection`, function(socket) {
           socket.send(JSON.stringify({request:`processSkurls`,result:`complete`,size:0}));
           sendLatestZip(socket);
           cleanupTempDir(tempdir); // We don't need to store the raw images anymore
-          BTIME = 250;
+          BTIME = 50; // Reset any rateLimit accumulation for the next request
         });
       } else if (message.request == `getLatestZip`) {
         jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) getLatestZip -> call sendLatestZip()`);
@@ -103,8 +103,8 @@ async function processSkurls(skurls, tempdir, socket) {
       skurl_batch.push(skurl);
       if (count % BSIZE == 0 || count == skurls.length) {
         batch_count++;
-        jlog(`processSkurls`, `(BATCH) Batch ${batch_count} ` + 
-             `\tCurls in batch: ${skurl_batch.length}\tBatch size: ${BSIZE}`);
+        jlog(`processSkurls`, `Starting Batch ${batch_count} ` +
+             `\tBatch size (configured): ${BSIZE}\tCurls in batch: ${skurl_batch.length}`);
         jlog(`processSkurls`, `(${bl}WAIT${rs}) Waiting for batch completion...`);
         await processSkurlBatch(skurl_batch, tempdir, socket);
         jlog(`processSkurls`, `(${gr}COMPLETE${rs}) Batch #${batch_count} has finished!`);
@@ -128,7 +128,7 @@ async function processSkurlBatch(skurls, tempdir, socket) {
   let skurl_retries = [];
   for (let skurl of skurls) {
     let fileext = getImageURLFileExtension(skurl.url);
-    let skuname = `${skurl.sku}${fileext}` // Make sure .jpg or .png from URL come along
+    let skuname = `${skurl.sku}${fileext}`; // Make sure .jpg or .png from URL come along
     let curl = syscall(`curl -s -o ${tempdir}/${skuname} ${skurl.url}`);
     curl_promises.push(curl.then(
       success => {
@@ -139,7 +139,7 @@ async function processSkurlBatch(skurls, tempdir, socket) {
           wlog(`curlImagePromise`, `7 - CURLE_COULDNT_CONNECT \t ${skurl.url}`);
           skurl_retries.push(skurl);
         } else if (err.code == 6) {
-          wlog(`curlImagePromise`, `6 - CURLE_COULDNT_RESOLVE_HOST \t ${skurl.url}`)
+          wlog(`curlImagePromise`, `6 - CURLE_COULDNT_RESOLVE_HOST \t ${skurl.url}`);
           skurl_retries.push(skurl);
         } else { elog(`curlImagePromise`, `${err.code} - ${err}`); }
     }).catch( e => { elog(`curlImagePromise`, e); }));

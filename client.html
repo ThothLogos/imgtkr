@@ -25,10 +25,13 @@
         <div id="progressBar" style="width: 0%;height: 30px;background-color: green;"></div>
       </div>
     </div>
-    <script type="text/javascript" src="FileSaver.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web-streams-polyfill@2.0.2/dist/ponyfill.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/eligrey/Blob.js/Blob.js"></script>
+    <script src="StreamSaver.js"></script>
+    <script src="FileSaver.js"></script>
     <script>
       const PORT = 8011;
-      const REQ_COUNT = 1132;
+      const REQ_COUNT = 3812;
 
       const btnGetZip    = document.getElementById(`btnGetZip`);
       const btnGetLatest = document.getElementById('btnGetLatest');
@@ -120,7 +123,47 @@
         if (msg.data instanceof Blob) {
           dlog(`Binary data incoming.`);
           lblStatus.textContent = `Zip received. Idle.`;
-          saveAs(msg.data, `plzwork.zip`);
+
+          /* THE EASY WAY:
+           * Use FileSaver, it's one line:
+           *
+           * saveAs(msg.data, `myzipname.zip`);
+           *
+           * Quite easy! But a problem: it has a size limit.
+           * Getting near 1500 images caused FireFox and other browsers to complain/crash.
+           *
+           * Highest successfully tested image count, Firefox: 1152
+           * Chromium behaves oddly, won't name the file as you ask, saves it as generic "download"
+           */
+
+
+          /* The Hard Way - StreamSaver
+           * 
+           * Fixes the chromium-based issues and makes them a superstar, Firefox modest gains
+           * 
+           * Highest working so far:
+           *  FireFox:  1532
+           *  Chromium: 3811
+           */
+          const blob = new Blob([msg.data]); // Save the incoming data as a Blob object
+          const fileStream = streamSaver.createWriteStream(`plzworkagain.zip`, {
+            size: blob.size
+          });
+          const readableStream = blob.stream();
+          if (window.WritableStream && readableStream.pipeTo) {
+            return readableStream.pipeTo(fileStream).then( () => {
+              dlog(`FileStream done writing`);
+            });
+          }
+          window.writer = fileStream.getWriter();
+          const reader = readableStream.getReader();
+          const pump = () => reader.read().then( res => {
+            res.done ? writer.close() : writer.write(res.value).then(pump);
+          });
+          pump();
+
+          // END StreamSaver
+
           websock.send(`Client received zip.`);
           enableButtons();
         } else if (isValidJSON(msg.data)) {
