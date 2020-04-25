@@ -9,10 +9,11 @@
       background-color:slategrey;
       white-space:pre-wrap"></textarea>
     </div>
-    <button id="btnGetZip">Send Array (New Zip)</button>
-    <button id="btnGetLatest">Get Latest Zip</button>
+    <button id="btnGetZip">Send Array</button>
+    <button id="btnGetLatest">Get Latest</button>
     <button id="btnGetZipHistory">Zip History</button>
-    <button id="btnGetZipByName">Get Specific Zip:</button>
+    <button id="btnServerVersion">Get Version</button>
+    <button id="btnGetZipByName">Get Zip:</button>
     <input id="txtZipName"></input>
     <br>
     <br>
@@ -33,7 +34,7 @@
     <script src="./jslib/FileSaver.js"></script>
     <script>
       const PORT = 8011;
-      const REQ_COUNT = 527;
+      const REQ_COUNT = 27;
 
       const btnGetZip    = document.getElementById(`btnGetZip`);
       const btnGetLatest = document.getElementById('btnGetLatest');
@@ -81,8 +82,8 @@
           let skuname = `SKU${randomIntFromInterval(1000000, 9999900)}`;
           last4 -= 1;
           skurls.push( { sku: skuname, url: urlref } );
-          if (i % 96 == 0) skurls.push(url_fail);
-          if (i % 83 == 0) skurls.push(prot_fail);
+          if (i % 12 == 0) skurls.push(url_fail);
+          if (i % 13 == 0) skurls.push(prot_fail);
         }
         return { request : "processSkurls", data: skurls };
       }
@@ -120,6 +121,11 @@
         } else {
           dlog(`Please enter a valid zipname. (ends in .zip!)`);
         }
+      }
+
+      function doGetServerVersion() {
+        try { websock.send(JSON.stringify({request:`getServerVersion`})); }
+        catch (e) { dlog(`ERROR doGetServerVersion: ${e}`); }
       }
 
       websock.onopen = function(event) {
@@ -185,6 +191,11 @@
             lblRequested.textContent = `${progress.imagecount}`;
             dlog(`  (SERVER) Processing ${progress.imagecount} image URLs.`);
             updateProgress(progress);
+          } else if (res.request == `processSkurls` && res.result == `failures`) {
+            dlog(`The following ${res.data.length} skurls failed:`);
+            for (let fail of res.data) {
+              dlog(`${fail.sku} \t ${fail.url}`);
+            }
           } else if (res.request == `processSkurls` && res.result == `complete`) {
             dlog(`  (SERVER) Done processing images. Sending zip.`);
             lblStatus.textContent = `Waiting on zip from server...`;
@@ -202,6 +213,8 @@
             dlog(res.data.join('\n'));
           } else if (res.request == `getZipByName` && res.result == `notfound`) {
             dlog(`Request ERR: This file was not found on the server: ${res.zipname}`);
+          } else if (res.request == `getServerVersion` && res.result == `success`) {
+            dlog(`Server reports running version: ${res.data}`);
           } else {
             dlog(`Unknown JSON response: ${res}`);
           }
@@ -215,6 +228,7 @@
       btnGetZipHistory.addEventListener(`click`, doGetZipHistory);
       btnGetZipByName.addEventListener(`click`, doGetZipByName);
       btnClearLog.addEventListener(`click`, event => { txtLog.value = ``; });
+      btnServerVersion.addEventListener(`click`, doGetServerVersion);
 
       function updateProgress(progress) {
         lblRemaining.textContent = `${progress.remaining}`;
