@@ -158,7 +158,7 @@ let skurl = { sku : "SKU123098", url : "https://img.example.com/images/somepic00
   - set `websocket.binaryType = 'blob'`
   - perform `websocket.send()` to push zipfile to client
   - `cp` the fresh `latest.zip` to `/cover-data/previous_zips/` and rename with datetime, ie `2020-04-21_191039.zip`
-  - perform auto-cleanup using `const MAXHIST` to determine how many historical zips to keep. This runs when any new zips are made and during server startup, prevent container filesystem bloat. Historical zips are kept in-case of oh-shit need, and for a future potential feature to allow the user to access previous archives for re-download.
+  - perform auto-cleanup using `const MAXHIST` to determine how many historical zips to keep. This runs when any new zips are made and during server startup, preventing container filesystem bloat. A history is kept to insure against "oh-shit" moments of lost/misplaced data.
   
 - __Server TODOs:__
 
