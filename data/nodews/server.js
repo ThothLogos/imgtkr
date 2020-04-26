@@ -23,6 +23,11 @@ const PORT      = 8011;   // WebSocketServer will listen here
 const MAXRETRIES = 100;   // Prevent run-away loops
 var   RETRIES    = 0;
 
+// Analytics
+const RL_TEST_FILE = `${DATADIR}/ratelimit_test.data` // Holds test results
+const RL_TEST_LOG  = `${DATADIR}/ratelimit_test.log`  // Logs which tests were run, when
+var   RL_TEST_RATE = 1;                        // This will be modified by initRLAnalytics() often
+
 // Descriptive ANSI color macros, saving char cols where I can
 const rs = `\x1b[0m`;
 const bd = `\x1b[1m`;
@@ -42,11 +47,20 @@ initHistoryDir();       // Check the HISTDIR for setup/cleanup, potential call t
 pruneRogueDirs();       // Check for & cleanup orphaned temp download dirs (from server interupts)
 elog(`serverStartup`, `The server was started (not actually an error)`, true, false);
 
+initRateLimitAnalytics();
+
 WebSocketServer.on(`connection`, function(socket) {
   socket.on(`message`, function(message) {
     if (isValidJSON(message)) {
       message = JSON.parse(message);
       if (message.request == `processSkurls`) {
+        let runtime0 = Date.now();
+
+        let rl_dat = getAnalyticsData(`ratelimit`);
+        RL_TEST_RATE = randomIntFromInterval(1,10);
+        console.log(`The analytics data holds: ${JSON.stringify(rl_dat)}`);
+        console.log(`RL_TEST_RATE set to: ${RL_TEST_RATE}`);
+
         jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) processSkurls -> call processSkurls()`);
         let tempdir = createTempDir();
         let acknowledgement = {request:`processSkurls`,result:`received`,size:message.data.length};
@@ -60,13 +74,19 @@ WebSocketServer.on(`connection`, function(socket) {
                 `See ${ERRLOGFILE} for specific skurl details.`);
             reportSkurlFails(skurl_fails, socket);
           } else {
-            jlog(`processSkurls`, `(${gr}COMPLETE${rs}) All skurls were retrieved, 0 fails.`);
+            jlog(`processSkurls`, `(${gr}success!${rs}) All skurls were retrieved, 0 fails.`);
           }
           buildLatestZip(tempdir);
           socket.send(JSON.stringify({request:`processSkurls`,result:`complete`,size:0}));
           sendLatestZip(socket);
           cleanupTempDir(tempdir); // We don't need to store the raw images anymore
           BTIME = 50; // Reset any rateLimit accumulation for the next request
+          let runtime1 = Date.now();
+          let tcase = { count: message.data.length, duration: runtime1-runtime0 };
+          (rl_dat[RL_TEST_RATE]).push(tcase);
+          //(rl_dat[RL_TEST_RATE]).push(runtime1-runtime0);
+          recordAnalyticsData(`ratelimit`, rl_dat);
+          console.log(`\nFinal runtime: ${runtime1 - runtime0}\n`);
         });
       } else if (message.request == `getLatestZip`) {
         jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) getLatestZip -> call sendLatestZip()`);
@@ -102,6 +122,60 @@ process.once('SIGTERM', () => {
 });
 
 
+/* * * * * * * * * * * * *
+ *  ANALYTICS FUNCTIONS  *
+ * * * * * * * * * * * * */
+
+
+function initRateLimitAnalytics() {
+  initAnalyticsLog(`ratelimit`);
+  initAnalyticsData(`ratelimit`);
+}
+
+function initAnalyticsLog(testname) {
+  let logpath = `${DATADIR}/${testname}_test.log`;
+  if (!fs.existsSync(logpath)) {
+    try {
+      fs.closeSync(fs.openSync(logpath, 'w'));
+      slog(`initAnalyticsLog`, `Created logfile at ${logpath}`);
+    } catch (e) { elog(`initAnalyticsLog`, `Unable to create a new ${logpath}!!`, false, true); }
+  }
+}
+
+function initAnalyticsData(testname) {
+  let datapath = `${DATADIR}/${testname}_test.data`;
+  if (!fs.existsSync(datapath)) {
+    try {
+      fs.closeSync(fs.openSync(datapath, 'w'));
+      let cases = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [], 9: [], 10: [] };
+      fs.writeFileSync(datapath, JSON.stringify(cases));
+      slog(`initAnalyticsData`, `Created datafile at ${datapath}`);
+    } catch (e) { elog(`initAnalyticsData`, `Unable to create a new ${datapath}!!`, false, true); }
+  }
+}
+
+function getAnalyticsData(testname) {
+  let datapath = `${DATADIR}/${testname}_test.data`;
+  if (fs.existsSync(datapath)) {
+    try {
+      let data = fs.readFileSync(datapath);
+      let obj = JSON.parse(data);
+      return obj;
+    } catch (e) { elog(`getAnalyticsData`, e); }
+
+  } else { elog(`getAnalyticsData`, `Can't find ${datapath} to load analytics data!`); }
+}
+
+function recordAnalyticsData(testname, data) {
+  let datapath = `${DATADIR}/${testname}_test.data`;
+  if (fs.existsSync(datapath)) {
+    try {
+      fs.writeFileSync(datapath, JSON.stringify(data));
+      console.log(`Analytics data written to file`);
+    } catch (e) { elog(`recordAnalyticsData`, e); }
+  } else { elog(`recordAnalyticsData`, `Can't find ${datapath} to load analytics data!`); }
+}
+
 
 /* * * * * * * * * * * * * * * * * *
  *   REQUEST-PROCESSING FUNCTIONS  *
@@ -117,17 +191,19 @@ async function processSkurls(skurls, tempdir, skurl_fails, socket) {
   elog(`processSkurls`, `New processSkurls() curl session has begun`, true, false);
   let skurl_batch = []; // will hold sub-array to be sent to processSkurlBatch()
   let skurl_count = 1;  // used in combination with BSIZE to segregate batches
-  let batch_count = 0;  // informational purposes in logging
-  let batch_fails = 0;  // informational purposes in logging
+  let batch_count = 0;  // informational output
+  let batch_fails = 0;  // informational output
+  let batch_total = getTotalBatches(skurls.length); // informational output
   for (let skurl of skurls) {
     if (isValidImageURL(skurl.url)) {
       skurl_batch.push(skurl);
       if (skurl_count % BSIZE == 0 || skurl_count == skurls.length) {
         batch_count++;
         let sf0 = skurl_fails.length;
-        jlog(`processSkurls`, `Starting Batch ${batch_count} ` +
+        jlog(`processSkurls`, `Starting Batch ${batch_count}/${batch_total} ` +
              `\tBatch size (configured): ${BSIZE}\tCurls in batch: ${skurl_batch.length}`);
         await processSkurlBatch(skurl_batch, tempdir, skurl_fails, socket);
+        await rateLimitTimeout(RL_TEST_RATE, false); // silent limit, gives the server 1ms to finish up writes
         batch_fails += skurl_fails.length - sf0;
         let fmsg = ``;
         if (batch_fails) fmsg = `(${rd}-${rs}) ${batch_fails} unrecoverable error(s) this batch.`;
@@ -373,8 +449,8 @@ function cleanupTempDir(tempdir) {
 
 // Used during processSkurls() asynchronous curl calls to slow them down
 // Better to rate-limit ourselves than fail curls b/c the target host blocked us
-async function rateLimitTimeout(ms) {
-  slog(`rateLimitTimeout`, `(${yl}LIMIT${rs}) Paused for ${ms} ms.`);
+async function rateLimitTimeout(ms, broadcast = true) {
+  if (broadcast) slog(`rateLimitTimeout`, `(${yl}LIMIT${rs}) Paused for ${ms} ms.`);
   return new Promise( resolve => { setTimeout( () => { resolve(`resolved!`); }, BTIME); });
 }
 
@@ -397,6 +473,12 @@ function getOldestHistZip(files) {
     }
   });
   return oldest;
+}
+
+function getTotalBatches(skurl_count) {
+  let total_batches = Math.floor(skurl_count / BSIZE);
+  if (skurl_count % BSIZE != 0) total_batches++;
+  return total_batches;
 }
 
 // Crappy regex to detect Unix-time formatted strings (10-digits)
@@ -422,6 +504,10 @@ function isValidJSON(str) {
 // Sanity-check URLs sent to us as part of the processSkurls request
 function isValidImageURL(image_url) {
   return /^(?:\w+:)?\/\/([^\s\.]+\.\S{2}|localhost[\:?\d]*)\S*$/.test(image_url);
+}
+
+function randomIntFromInterval(min, max) {
+  return Math.floor(Math.random() * (max - min + 1) + min);
 }
 
 // An absolutely disgusting process for generating custom datetime to name archived zips
