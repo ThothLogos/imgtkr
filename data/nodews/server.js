@@ -97,6 +97,8 @@ WebSocketServer.on(`connection`, function(socket) {
           // Cleanup and reset
           cleanupTempDir(tempdir); // We don't need to store the raw images anymore
           BTIME = 50;              // Reset any rateLimit accumulation for the next request
+
+          console.dir(getAvgOfAvgsRateLimit(rl_dat), {colors:true});
         });
       } else if (message.request == `getLatestZip`) {
         newreqlog(`getLatestZip -> call sendLatestZip()`);
@@ -183,6 +185,24 @@ function recordTestData(testname, data) {
       slog(`recordTestData`, `Analytics data written to ${datapath}`);
     } catch (e) { elog(`recordTestData`, e); }
   } else { elog(`recordTestData`, `Can't find ${datapath} to add data to!`); }
+}
+
+function getAvgOfAvgsRateLimit(rl_data) {
+  let results = { 0:null,1:null,2:null,3:null,4:null,5:null,6:null,7:null,9:null,10:null };
+  for (let timeout in rl_data) {
+    let tests = rl_data[timeout];
+    let avgs = 0;
+    tests.forEach( (t) => { avgs += t.average; } );
+    let obj = { average: +(avgs / tests.length).toFixed(4), samples: tests.length };
+    results[timeout] = obj
+  }
+  return results;
+}
+
+function getAverage(nums) {
+  let sum = 0;
+  coll.forEach( (item) => { sum += item });
+  return sum / coll.length;
 }
 
 
