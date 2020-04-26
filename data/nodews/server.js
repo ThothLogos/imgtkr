@@ -76,8 +76,8 @@ WebSocketServer.on(`connection`, function(socket) {
         sendZipHistory(socket);
       } else if (message.request == `getZipByName`) {
         let zip = message.zipname;
-        jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) getZipByName -> call sendZipByName(${zip})`);
-        sendZipByName(file, socket);
+        jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) getZipByName -> call sendZipByName()`);
+        sendZipByName(zip, socket);
       } else if (message.request == `getServerVersion`) {
         jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) getServerVersion -> call reportVersion()`);
         reportVersion(socket);
