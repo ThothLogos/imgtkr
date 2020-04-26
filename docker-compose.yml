@@ -42,7 +42,7 @@ services:
 
   nodews:
     build:
-      context: .
+      context: ./data/nodews/
       dockerfile: Dockerfile
     user: "node"
     restart: unless-stopped
