@@ -116,8 +116,9 @@ process.once('SIGTERM', () => {
 async function processSkurls(skurls, tempdir, skurl_fails, socket) {
   elog(`processSkurls`, `New processSkurls() curl session has begun`, true, false);
   let skurl_batch = []; // will hold sub-array to be sent to processSkurlBatch()
-  let batch_count = 0;  // used for informational purposes in logging, nothing more
   let skurl_count = 1;  // used in combination with BSIZE to segregate batches
+  let batch_count = 0;  // informational purposes in logging
+  let batch_fails = 0;  // informational purposes in logging
   for (let skurl of skurls) {
     if (isValidImageURL(skurl.url)) {
       skurl_batch.push(skurl);
@@ -127,16 +128,17 @@ async function processSkurls(skurls, tempdir, skurl_fails, socket) {
         jlog(`processSkurls`, `Starting Batch ${batch_count} ` +
              `\tBatch size (configured): ${BSIZE}\tCurls in batch: ${skurl_batch.length}`);
         await processSkurlBatch(skurl_batch, tempdir, skurl_fails, socket);
-        let sf1 = skurl_fails.length;
+        batch_fails += skurl_fails.length - sf0;
         let fmsg = ``;
-        if (sf1-sf0 > 0) fmsg = `(${rd}-${rs}) ${sf1-sf0} unrecoverable curl error(s) this batch.`;
+        if (batch_fails) fmsg = `(${rd}-${rs}) ${batch_fails} unrecoverable error(s) this batch.`;
         jlog(`processSkurls`, `(${gr}+${rs}) Batch ${batch_count} has finished. ${fmsg}`);
-        //await rateLimitTimeout(10); // give the server a brief window to close up some procs
         skurl_batch = [];
+        batch_fails = 0;
       }
     } else {
       elog(`isValidImageURL`, `Failed to pass URL regex: ${skurl.url}`);
       skurl_fails.push(skurl);
+      batch_fails++;
     }
     skurl_count++;
   }
@@ -146,7 +148,7 @@ async function processSkurls(skurls, tempdir, skurl_fails, socket) {
  *  - Receives a batch of skurls from processSkurls()
  *  - Fires off asynchronous curls for each skurl to grab the images
  *  - Writes those images to a tempdir with new filenames based on their SKU
- *  - Sends the client an "imagechunk" success object for each successful download (progress update)
+ *  - Sends the client an "imageChunk" success object for each successful download (progress update)
  *  - Returns Promise.all, allows processSkurls to wait for each batch to complete before proceeding
  */
 async function processSkurlBatch(skurls, tempdir, skurl_fails, socket) {
@@ -159,7 +161,7 @@ async function processSkurlBatch(skurls, tempdir, skurl_fails, socket) {
     let curl = syscall(`curl -s -o ${tempdir}/${skuname} ${skurl.url}`);
     curl_promises.push(curl.then(
       success => {
-        let chunk = { request:`imagechunk`,result:`success`,file:skuname };
+        let chunk = { request:`imageChunk`,result:`success`,file:skuname };
         socket.send(JSON.stringify(chunk)); }, // Send client notifications for each image success
       err => { 
         if (err.code == 1) {
