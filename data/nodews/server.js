@@ -58,11 +58,12 @@ WebSocketServer.on(`connection`, function(socket) {
         // Analytics
         RL_TEST_RATE = randomIntFromInterval(1,10);
         let rl_dat = getAnalyticsData(`ratelimit`);
-        let test_result = { count: message.data.length, duration: Date.now() };
-        slog(`RL_TEST_RATE ${RL_TEST_RATE}`, JSON.stringify(rl_dat));
+        let test_result = { count: message.data.length, duration: Date.now(), average: null };
+        slog(`RL_TEST_RATE`, `${RL_TEST_RATE}`);
+        console.dir(rl_dat, {colors:true});
 
         // Acknowledgement
-        jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) processSkurls -> call processSkurls()`);
+        newreqlog(`processSkurls -> call processSkurls()`);
         let ack = {request:`processSkurls`,result:`received`,size:message.data.length};
         socket.send(JSON.stringify(ack)); // Tell client we got the skurls and how many
 
@@ -82,7 +83,10 @@ WebSocketServer.on(`connection`, function(socket) {
 
           // Update analytics
           test_result.duration = Date.now() - test_result.duration;
-          (rl_dat[RL_TEST_RATE]).push(test_result);
+          test_result.average = +(test_result.duration / test_result.count).toFixed(4);
+          if (!rl_dat[RL_TEST_RATE]) rl_dat[RL_TEST_RATE] = [];
+          let curr = rl_dat[RL_TEST_RATE];
+          curr.push(test_result);
           recordTestData(`ratelimit`, rl_dat);
 
           // Prepare and ship the zip
@@ -95,17 +99,17 @@ WebSocketServer.on(`connection`, function(socket) {
           BTIME = 50;              // Reset any rateLimit accumulation for the next request
         });
       } else if (message.request == `getLatestZip`) {
-        jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) getLatestZip -> call sendLatestZip()`);
+        newreqlog(`getLatestZip -> call sendLatestZip()`);
         sendLatestZip(socket);
       } else if (message.request == `getZipHistory`) {
-        jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) getZipHistory -> call sendZipHistory()`);
+        newreqlog(`getZipHistory -> call sendZipHistory()`);
         sendZipHistory(socket);
       } else if (message.request == `getZipByName`) {
         let zip = message.zipname;
-        jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) getZipByName -> call sendZipByName()`);
+        newreqlog(`getZipByName -> call sendZipByName()`);
         sendZipByName(zip, socket);
       } else if (message.request == `getServerVersion`) {
-        jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) getServerVersion -> call reportVersion()`);
+        newreqlog(`getServerVersion -> call reportVersion()`);
         reportVersion(socket);
       } else {
         mlog(`unhandledMessage`, `Unknown JSON request received: ${message}`);
@@ -538,8 +542,10 @@ function elog(src, err, writetofile = true, broadcast = true) {
     logger.close;
   }
 }
+
 function wlog(src, wrn) { console.log(`[${yl}${bd}!${rs} ${yl}WRN ${bd}!${rs}] ${src}\t${wrn}`); }
 function jlog(src, msg) { console.log(`[ ${mg} JOB ${rs} ] ${src}\t${msg}`); }
 function mlog(src, msg) { console.log(`[${cy}MESSAGE${rs}] ${src}\t${msg}`); }
 function cleanuplog(src, msg) { console.log(`[${yl}CLEANUP${rs}] ${src}\t${msg}`); }
 function slog(src, msg) { console.log(`[ ${bl}STATE${rs} ] ${src}\t${msg}`); }
+function newreqlog(request) { jlog(` \t ${yl} NEW ${rs} \t`, `(${yl}REQUEST${rs}) ${request}`); }
