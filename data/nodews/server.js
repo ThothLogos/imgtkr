@@ -42,30 +42,33 @@ const wt = `\x1b[37m`;
 slog(`\t${bd}STARTUP${rs}`, `\tStarting Node WebSocket server on ${PORT}...`);
 const WebSocketServer = new ws({port: PORT});
 
-initErrorLogFile();     // Ensure the ERRLOGFILE exists
-initHistoryDir();       // Check the HISTDIR for setup/cleanup, potential call to pruneHistoryDir()
-pruneRogueDirs();       // Check for & cleanup orphaned temp download dirs (from server interupts)
-elog(`serverStartup`, `The server was started (not actually an error)`, true, false);
+initErrorLogFile();       // Ensure ERRLOGFILE exists
+initHistoryDir();         // Check HISTDIR for setup/cleanup, potential call to pruneHistoryDir()
+pruneRogueDirs();         // Check for & cleanup orphaned temp download dirs (from server interupts)
+initRateLimitAnalytics(); // Record runtime data on processSkurls requests, randomize delays
 
-initRateLimitAnalytics();
+elog(`serverStartup`, `The server was started (not actually an error)`, true, false);
 
 WebSocketServer.on(`connection`, function(socket) {
   socket.on(`message`, function(message) {
     if (isValidJSON(message)) {
       message = JSON.parse(message);
       if (message.request == `processSkurls`) {
-        let runtime0 = Date.now();
 
-        let rl_dat = getAnalyticsData(`ratelimit`);
+        // Analytics
         RL_TEST_RATE = randomIntFromInterval(1,10);
-        console.log(`The analytics data holds: ${JSON.stringify(rl_dat)}`);
-        console.log(`RL_TEST_RATE set to: ${RL_TEST_RATE}`);
+        let rl_dat = getAnalyticsData(`ratelimit`);
+        let test_result = { count: message.data.length, duration: Date.now() };
+        slog(`RL_TEST_RATE ${RL_TEST_RATE}`, JSON.stringify(rl_dat));
 
+        // Acknowledgement
         jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) processSkurls -> call processSkurls()`);
-        let tempdir = createTempDir();
-        let acknowledgement = {request:`processSkurls`,result:`received`,size:message.data.length};
-        socket.send(JSON.stringify(acknowledgement)); // Tell client we got the skurls and how many
-        let skurl_fails = []; // will hold any unhandled failed skurls, to be logged/sent clientside
+        let ack = {request:`processSkurls`,result:`received`,size:message.data.length};
+        socket.send(JSON.stringify(ack)); // Tell client we got the skurls and how many
+
+        // Begin request handling
+        let tempdir = createTempDir(); // stashes images to be zipped
+        let skurl_fails = [];          // will hold failed skurls, to be logged & reported to client
         processSkurls(message.data, tempdir, skurl_fails, socket).then( () => {
           jlog(`processSkurls`, `(${gr}done${rs}) Downloaded images saved to ${tempdir}/`);
           if (skurl_fails.length > 0) {
@@ -76,17 +79,20 @@ WebSocketServer.on(`connection`, function(socket) {
           } else {
             jlog(`processSkurls`, `(${gr}success!${rs}) All skurls were retrieved, 0 fails.`);
           }
+
+          // Update analytics
+          test_result.duration = Date.now() - test_result.duration;
+          (rl_dat[RL_TEST_RATE]).push(test_result);
+          recordTestData(`ratelimit`, rl_dat);
+
+          // Prepare and ship the zip
           buildLatestZip(tempdir);
           socket.send(JSON.stringify({request:`processSkurls`,result:`complete`,size:0}));
           sendLatestZip(socket);
+
+          // Cleanup and reset
           cleanupTempDir(tempdir); // We don't need to store the raw images anymore
-          BTIME = 50; // Reset any rateLimit accumulation for the next request
-          let runtime1 = Date.now();
-          let tcase = { count: message.data.length, duration: runtime1-runtime0 };
-          (rl_dat[RL_TEST_RATE]).push(tcase);
-          //(rl_dat[RL_TEST_RATE]).push(runtime1-runtime0);
-          recordAnalyticsData(`ratelimit`, rl_dat);
-          console.log(`\nFinal runtime: ${runtime1 - runtime0}\n`);
+          BTIME = 50;              // Reset any rateLimit accumulation for the next request
         });
       } else if (message.request == `getLatestZip`) {
         jlog(`\t${yl}NEW${rs}\t`, `(${yl}REQUEST${rs}) getLatestZip -> call sendLatestZip()`);
@@ -162,18 +168,17 @@ function getAnalyticsData(testname) {
       let obj = JSON.parse(data);
       return obj;
     } catch (e) { elog(`getAnalyticsData`, e); }
-
   } else { elog(`getAnalyticsData`, `Can't find ${datapath} to load analytics data!`); }
 }
 
-function recordAnalyticsData(testname, data) {
+function recordTestData(testname, data) {
   let datapath = `${DATADIR}/${testname}_test.data`;
   if (fs.existsSync(datapath)) {
     try {
       fs.writeFileSync(datapath, JSON.stringify(data));
-      console.log(`Analytics data written to file`);
-    } catch (e) { elog(`recordAnalyticsData`, e); }
-  } else { elog(`recordAnalyticsData`, `Can't find ${datapath} to load analytics data!`); }
+      slog(`recordTestData`, `Analytics data written to ${datapath}`);
+    } catch (e) { elog(`recordTestData`, e); }
+  } else { elog(`recordTestData`, `Can't find ${datapath} to add data to!`); }
 }
 
 
