@@ -123,10 +123,14 @@ async function processSkurls(skurls, tempdir, skurl_fails, socket) {
       skurl_batch.push(skurl);
       if (skurl_count % BSIZE == 0 || skurl_count == skurls.length) {
         batch_count++;
-        jlog(`processSkurls`, `(${yl}--${rs}) Starting Batch ${batch_count} ` +
+        let sf0 = skurl_fails.length;
+        jlog(`processSkurls`, `Starting Batch ${batch_count} ` +
              `\tBatch size (configured): ${BSIZE}\tCurls in batch: ${skurl_batch.length}`);
         await processSkurlBatch(skurl_batch, tempdir, skurl_fails, socket);
-        jlog(`processSkurls`, `(${gr}++${rs}) Batch ${batch_count} has finished!`);
+        let sf1 = skurl_fails.length;
+        let fmsg = ``;
+        if (sf1-sf0 > 0) fmsg = `(${rd}-${rs}) ${sf1-sf0} unrecoverable curl error(s) this batch.`;
+        jlog(`processSkurls`, `(${gr}+${rs}) Batch ${batch_count} has finished. ${fmsg}`);
         //await rateLimitTimeout(10); // give the server a brief window to close up some procs
         skurl_batch = [];
       }
@@ -143,7 +147,7 @@ async function processSkurls(skurls, tempdir, skurl_fails, socket) {
  *  - Fires off asynchronous curls for each skurl to grab the images
  *  - Writes those images to a tempdir with new filenames based on their SKU
  *  - Sends the client an "imagechunk" success object for each successful download (progress update)
- *  - Returns Promise.all that allows processSkurls to wait for each batch to complete before proceeding
+ *  - Returns Promise.all, allows processSkurls to wait for each batch to complete before proceeding
  */
 async function processSkurlBatch(skurls, tempdir, skurl_fails, socket) {
   jlog(`processSkurlBatch`, `(${bl}wait${rs}) Processing skurl batch...`);
@@ -214,7 +218,7 @@ function buildLatestZip(image_dir) {
     } else {
       elog(`buildLatestZip`, `Failed to verify ${LATESTZIP} existence for archival!`);
     }
-    jlog(`buildLatestZip`, `(${gr}done${rs}) ${LATESTZIP} is ready.`);
+    jlog(`buildLatestZip`, `(${gr}COMPLETE${rs}) ${LATESTZIP} is ready.`);
   } else {
     elog(`buildLatestZip`, `The directory ${image_dir} was empty! Cannot zip! Aborting.`);
   }
@@ -354,7 +358,7 @@ function pruneHistoryDir(files) {
 function cleanupTempDir(tempdir) {
   try {
     syscallSync(`rm -r ${tempdir}`);
-    cleanuplog(`cleanupTempDir`, `(${gr}done${rs}) Removed temporary directory ${tempdir}`);
+    cleanuplog(`cleanupTempDir`, `Removed temporary directory ${tempdir}`);
   } catch (e) { elog(`cleanupTempDir`, e); }
 }
 
@@ -363,6 +367,7 @@ function cleanupTempDir(tempdir) {
 /* * * * * * * * * * * *
  *   HELPER FUNCTIONS  *
  * * * * * * * * * * * */
+
 
 // Used during processSkurls() asynchronous curl calls to slow them down
 // Better to rate-limit ourselves than fail curls b/c the target host blocked us
@@ -432,7 +437,7 @@ function getDateName() {
 
 // Color Logging - Error, Warn, Job, Message, Cleanup, Status
 function elog(src, err, writetofile = true, broadcast = true) {
-  if (broadcast) console.log(`[ ${rd}${bd}!${rs} ${rd}ERR${rs} ] ${src}\t${err}`);
+  if (broadcast) console.log(`[${rd}${bd}!${rs} ${rd}ERR ${bd}!${rs}] ${src}\t${err}`);
   if (writetofile) {
     let logger = fs.createWriteStream(ERRLOGFILE, { flags: `a` });
     let dt = new Date().toISOString().slice(0, -5);
@@ -440,7 +445,7 @@ function elog(src, err, writetofile = true, broadcast = true) {
     logger.close;
   }
 }
-function wlog(src, wrn) { console.log(`[ ${yl}${bd}!${rs} ${yl}WRN${rs} ] ${src}\t${wrn}`); }
+function wlog(src, wrn) { console.log(`[${yl}${bd}!${rs} ${yl}WRN ${bd}!${rs}] ${src}\t${wrn}`); }
 function jlog(src, msg) { console.log(`[ ${mg} JOB ${rs} ] ${src}\t${msg}`); }
 function mlog(src, msg) { console.log(`[${cy}MESSAGE${rs}] ${src}\t${msg}`); }
 function cleanuplog(src, msg) { console.log(`[${yl}CLEANUP${rs}] ${src}\t${msg}`); }

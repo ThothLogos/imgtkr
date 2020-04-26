@@ -70,9 +70,9 @@ __The server will also fire back event updates that can be used by the Vue front
 // Server informs the client of every successful image completion
 // Can be used for GUI progress bars, logging, etc.
 {
-  request : 'imagechunk',
+  request : 'imageChunk',
   result  : 'success',
-  file    : '064508.jpg'
+  file    : 'SKU064508.jpg'
 }
 
 // Server sends a final notice that the Skurls request has finished server-side
