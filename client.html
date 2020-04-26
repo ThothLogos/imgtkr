@@ -32,10 +32,8 @@
     <script src="https://cdn.jsdelivr.net/gh/eligrey/Blob.js/Blob.js"></script>
     <script src="./jslib/StreamSaver.js"></script>
     <script src="./jslib/FileSaver.js"></script>
+    <script src="./jslib/clientconfig.js"></script>
     <script>
-      const PORT = 8011;
-      const REQ_COUNT = 327;
-
       const btnGetZip    = document.getElementById(`btnGetZip`);
       const btnGetLatest = document.getElementById('btnGetLatest');
       const btnClearLog  = document.getElementById(`btnClearLog`);
@@ -73,8 +71,6 @@
 
       function genImageListRequest() {
         let skurls = [];
-        skurls.push(prot_fail);
-        skurls.push(url_fail);
         // Generate some test URLs from Diamond Comics some fake SKUs we just make up
         let last4 = randomIntFromInterval(5000,9999);
         for(let i = REQ_COUNT; i > 0; i--) {
@@ -82,8 +78,10 @@
           let skuname = `SKU${randomIntFromInterval(1000000, 9999900)}`;
           last4 -= 1;
           skurls.push( { sku: skuname, url: urlref } );
-          if (i % 83 == 0) skurls.push(url_fail);
-          if (i % 71 == 0) skurls.push(prot_fail);
+
+          // Forced Error Insertion
+          //if (i % 83 == 0) skurls.push(url_fail);
+          //if (i % 71 == 0) skurls.push(prot_fail);
         }
         return { request : "processSkurls", data: skurls };
       }
