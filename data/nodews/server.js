@@ -99,6 +99,7 @@ WebSocketServer.on(`connection`, function(socket) {
           BTIME = 50;              // Reset any rateLimit accumulation for the next request
 
           console.dir(getAvgOfAvgsRateLimit(rl_dat), {colors:true});
+          slog(`RL_TEST_RATE`, `${RL_TEST_RATE}`);
         });
       } else if (message.request == `getLatestZip`) {
         newreqlog(`getLatestZip -> call sendLatestZip()`);
