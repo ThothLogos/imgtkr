@@ -60,7 +60,7 @@ WebSocketServer.on(`connection`, function(socket) {
         let rl_dat = getAnalyticsData(`ratelimit`);
         let test_result = { count: message.data.length, duration: Date.now(), average: null };
         slog(`RL_TEST_RATE`, `${RL_TEST_RATE}`);
-        console.dir(rl_dat, {colors:true});
+        //console.dir(rl_dat, {colors:true});
 
         // Acknowledgement
         newreqlog(`processSkurls -> call processSkurls()`);
@@ -197,12 +197,6 @@ function getAvgOfAvgsRateLimit(rl_data) {
     results[timeout] = obj
   }
   return results;
-}
-
-function getAverage(nums) {
-  let sum = 0;
-  coll.forEach( (item) => { sum += item });
-  return sum / coll.length;
 }
 
 
@@ -536,7 +530,8 @@ function isValidImageURL(image_url) {
 }
 
 function randomIntFromInterval(min, max) {
-  return Math.floor(Math.random() * (max - min + 1) + min);
+  //return Math.floor(Math.random() * (max - min + 1)) + min;
+  return Math.floor(Math.random() * 11);
 }
 
 // An absolutely disgusting process for generating custom datetime to name archived zips
