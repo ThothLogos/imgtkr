@@ -192,8 +192,9 @@ function getAvgOfAvgsRateLimit(rl_data) {
   for (let timeout in rl_data) {
     let tests = rl_data[timeout];
     let avgs = 0;
-    tests.forEach( (t) => { avgs += t.average; } );
-    let obj = { average: +(avgs / tests.length).toFixed(4), samples: tests.length };
+    let curls = 0;
+    tests.forEach( (t) => { avgs += t.average; curls += t.count } );
+    let obj = { average: +(avgs / tests.length).toFixed(4), samples: tests.length, curls: curls };
     results[timeout] = obj
   }
   return results;
@@ -289,7 +290,7 @@ async function processSkurlBatch(skurls, tempdir, skurl_fails, socket) {
       RETRIES++;
       BTIME += 500;
       await rateLimitTimeout(BTIME); // don't piss off imagehosts
-      await processSkurls(skurl_retries, tempdir, socket); // Recurse our failures (what a metaphor)
+      await processSkurls(skurl_retries, tempdir, skurl_fails, socket); // Recurse our failures (what a metaphor)
     }
   } else { BTIME <= 25 ? BTIME = 25 : BTIME -= 50; }
 }
