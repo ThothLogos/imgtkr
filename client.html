@@ -202,7 +202,7 @@
 
           websock.send(`Client received zip.`);
           enableButtons();
-          let wait = Math.floor(Math.random() * 10) + 8;
+          let wait = Math.floor(Math.random() * 10) + 15;
           dlog(`Waiting ${wait}`);
           setTimeout( () => { if (loop == true) doGetZip() }, wait*1000);
         } else if (isValidJSON(msg.data)) {
