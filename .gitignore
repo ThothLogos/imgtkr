@@ -1,2 +1,4 @@
 package-lock.json
 node_modules/
+jslib/clientconfig.js
+jslib/serverconfig.js

@@ -18,6 +18,8 @@
     <br>
     <br>
     <button id="btnClearLog">Clear Log</button>
+    <button id="btnLoopToggle">Not Looping</button>
+    Total Requests: <input id="txtRequests"></input>
     <div style="width:70%">
       <div id="counts" style="font-family: monospace;">
        <p>Status: <span id="lblStatus">Idle</span>
@@ -34,7 +36,7 @@
     <script src="./jslib/FileSaver.js"></script>
     <script>
       const PORT = 8011;
-      const REQ_COUNT = 327;
+      var   REQ_COUNT = 0;
 
       const btnGetZip    = document.getElementById(`btnGetZip`);
       const btnGetLatest = document.getElementById('btnGetLatest');
@@ -51,6 +53,8 @@
       const url_fail = { sku: `notaurl`, url: `notaurl` };
 
       let progress = { imagecount : 0, remaining: 0, currentprog : 0 };
+
+      let loop = false;
 
       txtLog.value          = ``;
       lblStatus.textContent = `Offline. Idle.`;
@@ -73,8 +77,6 @@
 
       function genImageListRequest() {
         let skurls = [];
-        skurls.push(prot_fail);
-        skurls.push(url_fail);
         // Generate some test URLs from Diamond Comics some fake SKUs we just make up
         let last4 = randomIntFromInterval(5000,9999);
         for(let i = REQ_COUNT; i > 0; i--) {
@@ -82,19 +84,27 @@
           let skuname = `SKU${randomIntFromInterval(1000000, 9999900)}`;
           last4 -= 1;
           skurls.push( { sku: skuname, url: urlref } );
-          if (i % 83 == 0) skurls.push(url_fail);
-          if (i % 71 == 0) skurls.push(prot_fail);
+
+          // Forced Error Insertion
+          //if (i % 83 == 0) skurls.push(url_fail);
+          //if (i % 71 == 0) skurls.push(prot_fail);
         }
         return { request : "processSkurls", data: skurls };
       }
 
       function doGetZip() {
-        disableButtons();
-        dlog(`Sending image array to server.`);
-        let list = genImageListRequest();
-        let json = JSON.stringify(list);
-        try { websock.send(json); }
-        catch (e) { dlog(`ERROR genImageListRequest send failed! ${e}`); }
+        dlog(`Holding ${txtRequests.value}`);
+        REQ_COUNT = parseInt(txtRequests.value);
+        if (REQ_COUNT > 0 && typeof REQ_COUNT == `number`) {
+          disableButtons();
+          dlog(`Sending image array to server.`);
+          let list = genImageListRequest();
+          let json = JSON.stringify(list);
+          try { websock.send(json); }
+          catch (e) { dlog(`ERROR genImageListRequest send failed! ${e}`); }
+        } else {
+          dlog(`Not a valid Requests value`);
+        }
       }
 
       function doGetLatest() {
@@ -126,6 +136,14 @@
       function doGetServerVersion() {
         try { websock.send(JSON.stringify({request:`getServerVersion`})); }
         catch (e) { dlog(`ERROR doGetServerVersion: ${e}`); }
+      }
+
+      function doLoopToggle() {
+        loop = !loop;
+        if (loop) {
+          btnLoopToggle.textContent = `Looping`;
+        } else { btnLoopToggle.textContent = `Not Looping`; }
+        dlog(`Loop was toggled to: ${loop}`);
       }
 
       websock.onopen = function(event) {
@@ -160,6 +178,8 @@
            *  FireFox:  1532
            *  Chromium: 3811
            */
+
+          /*
           const blob = new Blob([msg.data]); // Save the incoming data as a Blob object
           const fileStream = streamSaver.createWriteStream(`plzworkagain.zip`, {
             size: blob.size
@@ -176,11 +196,15 @@
             res.done ? writer.close() : writer.write(res.value).then(pump);
           });
           pump();
+          */
 
           // END StreamSaver
 
           websock.send(`Client received zip.`);
           enableButtons();
+          let wait = Math.floor(Math.random() * 10) + 15;
+          dlog(`Waiting ${wait}`);
+          setTimeout( () => { if (loop == true) doGetZip() }, wait*1000);
         } else if (isValidJSON(msg.data)) {
           let res = JSON.parse(msg.data);
           if (res.request == `processSkurls` && res.result == `received`) {
@@ -229,6 +253,7 @@
       btnGetZipByName.addEventListener(`click`, doGetZipByName);
       btnClearLog.addEventListener(`click`, event => { txtLog.value = ``; });
       btnServerVersion.addEventListener(`click`, doGetServerVersion);
+      btnLoopToggle.addEventListener(`click`, doLoopToggle);
 
       function updateProgress(progress) {
         lblRemaining.textContent = `${progress.remaining}`;
