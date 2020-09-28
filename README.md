@@ -1,3 +1,52 @@
+# Current Implementation Details
+
+
+### Server-side
+
+- 4th container added to the stack - mostly default `node:12.16.2-alpine3.9` image with some additions: `zip`, `curl` and `npm install ws` (websocket lib).
+
+- Nginx confs modified to set up proxy_pass to websocket server on port `8011`. The only change to Nginx's docker-compose configuration is a new volume directive `./data/nginx.conf:/etc/nginx/nginx.conf` to install the modified conf.
+
+- `server.js` listens on `nodews` container at `8011`, any messages passed to the server are checked for their `message.request` property, which contain procotol keywords to trigger and track server-side events.
+
+- A new data type known as the "skurl" has been born to reference such a construction:
+
+```javascript
+let skurl = { sku : "SKU123098", url : "https://img.example.com/images/somepic0001.jpg" };
+```
+
+- Current process for handling the `processSkurls` request type:
+
+  - create a temporary directory named with a unix-timestamp
+  - `processSkurls()` uses the `BSIZE` constant to count up and fire-off batches of curls at a time (basically it self-limits the maximum number of concurrent curl processes that can be spun up)
+  - each batch is allowed to fully finish before the next is processed
+  - batches are passed off to `processSkurlBatch()` which does the work
+  - do asynchronous calls to `curl` for each image in the batch
+  - use regex capture on each `skurl.url` to get the `file_ext` ie jpg, png, etc
+  - use the `skurl.sku` along with the captured `file_ext` to rename files to `${skurl.sku}.${file_ext}`. The actual re-naming happens as part of the `curl` command's parameters.
+  - after all `curl` calls return in the batch, control is passed back to `processSkurls()` to get the next batch
+  - after all batches complete, perform synchronous syscall to `zip` to package all SKUnamed images, placing the resultant file at `/cover-data/latest.zip`
+  - do `fs.readFileSync()` on the finished zip, prep binary data for transfer
+  - set `websocket.binaryType = 'blob'`
+  - perform `websocket.send()` to push zipfile to client
+  - `cp` the fresh `latest.zip` to `/cover-data/previous_zips/` and rename with datetime, ie `2020-04-21_191039.zip`
+  - perform auto-cleanup using `const MAXHIST` to determine how many historical zips to keep. This runs when any new zips are made and during server startup, preventing container filesystem bloat. A history is kept to insure against "oh-shit" moments of lost/misplaced data.
+  
+- __Server TODOs:__
+
+  - Stress test, run the client script with hundreds of requests - try to double/triple-run before conclusion, etc.
+  
+ ### Client-side
+ 
+- Basic html page serving as prototype, core functionality is just maintaining the websocket connection and pushing a properly formatted request to the server. The test `client.html` generates dummy skurls for development uses.
+
+- Some basic GUI, added client-side console for easier output monitoring, progress bar that updates based on server's `imagechunk` responses. Added buttons that are disabled while download is waiting for zip return.
+
+- __Client TODOs:__
+
+  - Handle refreshes - it kills the client end of the socket apparently? Can we trap the close/refresh and post a message to the server before we die so it can wind-down & cleanup?
+  - Stress test the server with unconventional requests: very large numbers, double-sends, etc.
+  
 # Request Structure
 
 ## Client Requests
@@ -138,53 +187,3 @@ socket.onmessage = (message) => {
   }
 }
 ```
-
-# Current Implementation Details
-
-
-### Server-side
-
-- 4th container added to the stack - mostly default `node:12.16.2-alpine3.9` image with some additions: `zip`, `curl` and `npm install ws` (websocket lib).
-
-- Nginx confs modified to set up proxy_pass to websocket server on port `8011`. The only change to Nginx's docker-compose configuration is a new volume directive `./data/nginx.conf:/etc/nginx/nginx.conf` to install the modified conf.
-
-- `server.js` listens on `nodews` container at `8011`, any messages passed to the server are checked for their `message.request` property, which contain procotol keywords to trigger and track server-side events.
-
-- A new data type known as the "skurl" has been born to reference such a construction:
-
-```javascript
-let skurl = { sku : "SKU123098", url : "https://img.example.com/images/somepic0001.jpg" };
-```
-
-- Current process for handling the `processSkurls` request type:
-
-  - create a temporary directory named with a unix-timestamp
-  - `processSkurls()` uses the `BSIZE` constant to count up and fire-off batches of curls at a time (basically it self-limits the maximum number of concurrent curl processes that can be spun up)
-  - each batch is allowed to fully finish before the next is processed
-  - batches are passed off to `processSkurlBatch()` which does the work
-  - do asynchronous calls to `curl` for each image in the batch
-  - use regex capture on each `skurl.url` to get the `file_ext` ie jpg, png, etc
-  - use the `skurl.sku` along with the captured `file_ext` to rename files to `${skurl.sku}.${file_ext}`. The actual re-naming happens as part of the `curl` command's parameters.
-  - after all `curl` calls return in the batch, control is passed back to `processSkurls()` to get the next batch
-  - after all batches complete, perform synchronous syscall to `zip` to package all SKUnamed images, placing the resultant file at `/cover-data/latest.zip`
-  - do `fs.readFileSync()` on the finished zip, prep binary data for transfer
-  - set `websocket.binaryType = 'blob'`
-  - perform `websocket.send()` to push zipfile to client
-  - `cp` the fresh `latest.zip` to `/cover-data/previous_zips/` and rename with datetime, ie `2020-04-21_191039.zip`
-  - perform auto-cleanup using `const MAXHIST` to determine how many historical zips to keep. This runs when any new zips are made and during server startup, preventing container filesystem bloat. A history is kept to insure against "oh-shit" moments of lost/misplaced data.
-  
-- __Server TODOs:__
-
-  - Stress test, run the client script with hundreds of requests - try to double/triple-run before conclusion, etc.
-  
- ### Client-side
- 
-- Basic html page serving as prototype, core functionality is just maintaining the websocket connection and pushing a properly formatted request to the server. The test `client.html` generates dummy skurls for development uses.
-
-- Some basic GUI, added client-side console for easier output monitoring, progress bar that updates based on server's `imagechunk` responses. Added buttons that are disabled while download is waiting for zip return.
-
-- __Client TODOs:__
-
-  - Handle refreshes - it kills the client end of the socket apparently? Can we trap the close/refresh and post a message to the server before we die so it can wind-down & cleanup?
-  - Stress test the server with unconventional requests: very large numbers, double-sends, etc.
-  
